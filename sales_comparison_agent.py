@@ -15,7 +15,8 @@ def load_gsheet(sheet_url):
     client = gspread.authorize(creds)
     sheet = client.open_by_url(sheet_url)
     worksheet = sheet.sheet1
-    data = worksheet.get_all_records()
+    # Specify header row explicitly to avoid duplicate header errors
+    data = worksheet.get_all_records(head=1, expected_headers=["Billing Account Number", "Internet", "TV", "Phone"])
     return pd.DataFrame(data)
 
 # --- Product extraction for internal CSV (grouped by account) ---
@@ -31,7 +32,7 @@ def normalize_client_data(df):
     df['Internet'] = df['Internet'].apply(lambda x: 1 if str(x).strip() else 0)
     df['TV'] = df['TV'].apply(lambda x: 1 if str(x).strip() else 0)
     df['Phone'] = df['Phone'].apply(lambda x: 1 if str(x).strip() else 0)
-    return df
+    return df.rename(columns={"Billing Account Number": "Account Number"})
 
 # --- Comparison logic ---
 def compare_sales(internal_df, client_df):
