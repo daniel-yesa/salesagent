@@ -5,6 +5,7 @@ from google.oauth2.service_account import Credentials
 from datetime import datetime
 import time
 import json
+import io
 
 # --- Setup Google Sheets API ---
 scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
@@ -26,19 +27,18 @@ def load_gsheet(sheet_url):
     if "Billing Account Number" in df.columns:
         df.rename(columns={"Billing Account Number": "Account Number"}, inplace=True)
 
-    # Ensure expected product columns are present
     for col in ["Internet", "TV", "Phone"]:
         if col not in df.columns:
             df[col] = ""
     return df
 
-# --- Product extraction for internal CSV (grouped by account) ---
+# --- Product extraction for internal data ---
 def summarize_internal_data(df):
     if "Billing Account Number" in df.columns and "Account Number" not in df.columns:
         df.rename(columns={"Billing Account Number": "Account Number"}, inplace=True)
 
     if "Account Number" not in df.columns:
-        raise ValueError("The internal CSV must contain an 'Account Number' column.")
+        raise ValueError("The internal data must contain an 'Account Number' column.")
 
     df['Internet'] = df['Product Name'].str.contains("INT", case=False, na=False).astype(int)
     df['TV'] = df['Product Name'].str.contains("TV", case=False, na=False).astype(int)
@@ -92,15 +92,25 @@ st.title("💼 Sales Comparison Agent")
 st.write("Easily validate internal sales data with client-reported records.")
 
 with st.expander("🔧 Configure and Run", expanded=True):
-    uploaded_file = st.file_uploader("📤 Upload Internal Sales CSV", type=["csv"])
+    uploaded_file = st.file_uploader("📤 Upload Internal Sales CSV or Excel", type=["csv", "xlsx"])
     sheet_url = st.text_input("🔗 Paste Client Google Sheet URL")
     date_filter = st.date_input("📅 Choose Sale Date", value=None)
     run_button = st.button("🚀 Run Data Comparison")
 
 if uploaded_file:
-    internal_preview = pd.read_csv(uploaded_file, nrows=5)
-    st.caption("🔍 Preview of Internal Data:")
-    st.dataframe(internal_preview)
+    try:
+        if uploaded_file.name.endswith(".csv"):
+            internal_preview = pd.read_csv(uploaded_file, nrows=5)
+        else:
+            internal_preview = pd.read_excel(uploaded_file, nrows=5)
+
+        if internal_preview.empty or len(internal_preview.columns) == 0:
+            st.warning("⚠️ Uploaded file has no readable columns. Please check the format.")
+        else:
+            st.caption("🔍 Preview of Internal Data:")
+            st.dataframe(internal_preview)
+    except Exception as e:
+        st.error(f"⚠️ Could not read file: {e}")
 
 progress_placeholder = st.empty()
 
@@ -109,11 +119,15 @@ if uploaded_file and sheet_url and date_filter and run_button:
         progress_bar = progress_placeholder.progress(0, text="⏳ Starting comparison...")
 
         # Load and process internal data
-        internal_raw = pd.read_csv(uploaded_file)
+        if uploaded_file.name.endswith(".csv"):
+            internal_raw = pd.read_csv(uploaded_file)
+        else:
+            internal_raw = pd.read_excel(uploaded_file)
+
         progress_bar.progress(20, text="📄 Loading internal sales data...")
 
         if 'Date of Sale' not in internal_raw.columns:
-            st.error("❌ CSV must contain a 'Date of Sale' column.")
+            st.error("❌ File must contain a 'Date of Sale' column.")
             st.stop()
 
         internal_raw['Date of Sale'] = pd.to_datetime(internal_raw['Date of Sale'], errors='coerce')
@@ -144,4 +158,4 @@ if uploaded_file and sheet_url and date_filter and run_button:
     except Exception as e:
         st.error(f"⚠️ An error occurred: {str(e)}")
 else:
-    st.info("ℹ️ Upload a CSV, enter a Google Sheet URL, and select a date to start.")
+    st.info("ℹ️ Upload a CSV or Excel file, enter a Google Sheet URL, and select a date to start.")
