@@ -25,6 +25,11 @@ def load_gsheet(sheet_url):
     df = pd.DataFrame(data_rows, columns=headers)
     if "Billing Account Number" in df.columns:
         df.rename(columns={"Billing Account Number": "Account Number"}, inplace=True)
+
+    # Ensure expected product columns are present
+    for col in ["Internet", "TV", "Phone"]:
+        if col not in df.columns:
+            df[col] = ""
     return df
 
 # --- Product extraction for internal CSV (grouped by account) ---
