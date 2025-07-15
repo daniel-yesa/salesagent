@@ -34,6 +34,12 @@ def load_gsheet(sheet_url):
 
 # --- Product extraction for internal CSV (grouped by account) ---
 def summarize_internal_data(df):
+    if "Billing Account Number" in df.columns and "Account Number" not in df.columns:
+        df.rename(columns={"Billing Account Number": "Account Number"}, inplace=True)
+
+    if "Account Number" not in df.columns:
+        raise ValueError("The internal CSV must contain an 'Account Number' column.")
+
     df['Internet'] = df['Product Name'].str.contains("INT", case=False, na=False).astype(int)
     df['TV'] = df['Product Name'].str.contains("TV", case=False, na=False).astype(int)
     df['Phone'] = df['Product Name'].str.contains("HP", case=False, na=False).astype(int)
@@ -91,6 +97,11 @@ with st.expander("🔧 Configure and Run", expanded=True):
     date_filter = st.date_input("📅 Choose Sale Date", value=None)
     run_button = st.button("🚀 Run Data Comparison")
 
+if uploaded_file:
+    internal_preview = pd.read_csv(uploaded_file, nrows=5)
+    st.caption("🔍 Preview of Internal Data:")
+    st.dataframe(internal_preview)
+
 progress_placeholder = st.empty()
 
 if uploaded_file and sheet_url and date_filter and run_button:
@@ -101,8 +112,8 @@ if uploaded_file and sheet_url and date_filter and run_button:
         internal_raw = pd.read_csv(uploaded_file)
         progress_bar.progress(20, text="📄 Loading internal sales data...")
 
-        if 'Date of Sale' not in internal_raw.columns or 'Account Number' not in internal_raw.columns:
-            st.error("❌ CSV must contain 'Date of Sale' and 'Account Number' columns.")
+        if 'Date of Sale' not in internal_raw.columns:
+            st.error("❌ CSV must contain a 'Date of Sale' column.")
             st.stop()
 
         internal_raw['Date of Sale'] = pd.to_datetime(internal_raw['Date of Sale'], errors='coerce')
