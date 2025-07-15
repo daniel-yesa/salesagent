@@ -15,8 +15,14 @@ def load_gsheet(sheet_url):
     client = gspread.authorize(creds)
     sheet = client.open_by_url(sheet_url)
     worksheet = sheet.sheet1
-    data = worksheet.get_all_records(head=1)
-    df = pd.DataFrame(data)
+
+    # Find first row with real headers
+    rows = worksheet.get_all_values()
+    header_row_index = next((i for i, row in enumerate(rows) if any(cell.strip() for cell in row)), 0)
+    headers = rows[header_row_index]
+    data_rows = rows[header_row_index + 1:]
+
+    df = pd.DataFrame(data_rows, columns=headers)
     if "Billing Account Number" in df.columns:
         df.rename(columns={"Billing Account Number": "Account Number"}, inplace=True)
     return df
