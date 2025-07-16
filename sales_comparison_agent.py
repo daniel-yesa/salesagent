@@ -45,9 +45,15 @@ def load_gsheet(sheet_url):
         if col not in df.columns:
             df[col] = ""
 
+    if "SO Status" in df.columns:
+        df["SO Status"] = df["SO Status"].astype(str).str.strip()
+        df[['Internet', 'TV', 'Phone']] = df[['Internet', 'TV', 'Phone']].applymap(lambda x: 1 if str(x).strip() else 0)
+        df = df.groupby(['Account Number', 'SO Status'], as_index=False)[['Internet', 'TV', 'Phone']].max()
+    else:
+        raise ValueError("❌ Column 'SO Status' is missing from PSUReport tab. Cannot merge records reliably.")
+
     return df
 
-# --- Product extraction for internal data ---
 INTERNET_KEYWORDS = [
     "1 Gig", "500 Mbps", "200 Mbps", "100 Mbps",
     "UltraFibre 60 - Unlimited", "UltraFibre 90 - Unlimited",
@@ -64,7 +70,7 @@ TV_KEYWORDS = [
 PHONE_KEYWORDS = ["Freedom", "Basic", "Landline Phone"]
 
 def match_product(product, keywords):
-    return any(k == str(product) for k in keywords)  # strict case-sensitive match
+    return any(k == str(product) for k in keywords)
 
 def summarize_internal_data(df):
     debug_internal_headers = list(df.columns)
@@ -83,14 +89,12 @@ def summarize_internal_data(df):
     summary = df.groupby('Account Number')[['Internet', 'TV', 'Phone']].max().reset_index()
     return summary
 
-# --- Normalize client data ---
 def normalize_client_data(df):
     df['Internet'] = df['Internet'].apply(lambda x: 1 if str(x).strip() else 0)
     df['TV'] = df['TV'].apply(lambda x: 1 if str(x).strip() else 0)
     df['Phone'] = df['Phone'].apply(lambda x: 1 if str(x).strip() else 0)
     return df
 
-# --- Comparison logic ---
 def compare_sales(internal_df, client_df, start_date, end_date):
     internal_df['Account Number'] = internal_df['Account Number'].astype(str)
     client_df['Account Number'] = client_df['Account Number'].astype(str)
@@ -117,15 +121,12 @@ def compare_sales(internal_df, client_df, start_date, end_date):
         all_dates = account_all_dates.get(acct, [])
         products_missing = all(pd.isnull(row.get(f + '_Client')) for f in ['Internet', 'TV', 'Phone'])
 
-        # 1. Missing from report
         if acct not in account_date_map or products_missing:
             return "Missing from report"
 
-        # 2. PSU mismatch
         if any(row.get(f + '_YESA') != row.get(f + '_Client') for f in ['Internet', 'TV', 'Phone']):
             return "PSU - no match"
 
-        # 3. Wrong date — only if *none* of the account's client entries are in range
         if all(pd.notnull(d) and not (start_date <= d.date() <= end_date) for d in all_dates):
             return "Missing from report - Wrong date"
 
