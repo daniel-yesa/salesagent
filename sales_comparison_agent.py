@@ -65,7 +65,7 @@ TV_KEYWORDS = [
 PHONE_KEYWORDS = ["Freedom", "Basic", "Landline Phone"]
 
 def match_product(product, keywords):
-    return any(k in str(product) for k in keywords)  # Case-sensitive match
+    return any(k in str(product) for k in keywords)  # case-sensitive match
 
 def summarize_internal_data(df):
     debug_internal_headers = list(df.columns)
@@ -101,41 +101,22 @@ def compare_sales(internal_df, client_df):
 
     log.append(f"🔍 Merging {len(internal_df)} internal rows with {len(client_df)} client rows")
 
-    merged['Reason'] = merged.apply(
-        lambda row: "Missing from report" if pd.isnull(row['Internet_Client'])
-        else ("PSU - no match" if (row['Internet_YESA'] != row['Internet_Client'] or
-                                   row['TV_YESA'] != row['TV_Client'] or
-                                   row['Phone_YESA'] != row['Phone_Client']) else None), axis=1)
+    def reason_logic(row):
+        if pd.isnull(row['Internet_Client']) and row['Account Number'] in client_df['Account Number'].values:
+            return "Missing from report (wrong day)"
+        elif pd.isnull(row['Internet_Client']):
+            return "Missing from report"
+        elif row['Internet_YESA'] != row['Internet_Client'] or row['TV_YESA'] != row['TV_Client'] or row['Phone_YESA'] != row['Phone_Client']:
+            return "PSU - no match"
+        else:
+            return None
 
+    merged['Reason'] = merged.apply(reason_logic, axis=1)
     mismatches = merged[merged['Reason'].notnull()]
     return mismatches
 
 # --- Streamlit UI ---
 st.set_page_config(page_title="Sales Comparison Agent", layout="centered")
-st.markdown("""
-    <style>
-        .main {
-            padding: 2rem;
-            background-color: #f9f9f9;
-        }
-        .stButton>button {
-            width: 100%;
-            background-color: #4CAF50;
-            color: white;
-            font-weight: bold;
-            border-radius: 6px;
-            padding: 0.75rem;
-            font-size: 16px;
-        }
-        .stFileUploader, .stDateInput, .stTextInput {
-            margin-bottom: 1rem;
-        }
-        .css-1aumxhk, .css-1cpxqw2 {
-            font-family: 'Segoe UI', sans-serif;
-        }
-    </style>
-""", unsafe_allow_html=True)
-
 st.title("💼 Sales Comparison Agent")
 st.write("Easily validate internal sales data with client-reported records.")
 
@@ -144,24 +125,6 @@ with st.expander("🔧 Configure and Run", expanded=True):
     sheet_url = st.text_input("🔗 Paste Client Google Sheet URL", value="https://docs.google.com/spreadsheets/d/1tamMxhdJ-_wuyCrmu9mK6RiVj1lZsUJBSm0gSBbjQwM/edit?gid=1075311190#gid=1075311190")
     date_filter = st.date_input("🗕️ Choose Sale Date", value=None)
     run_button = st.button("🚀 Run Data Comparison")
-
-if uploaded_file:
-    try:
-        if uploaded_file.name.endswith(".csv"):
-            content = uploaded_file.read().decode("utf-8", errors="ignore")
-            lines = [line for line in content.splitlines() if line.strip() != ""]
-            preview_df = pd.read_csv(io.StringIO("\n".join(lines[:10])))
-            uploaded_file.seek(0)
-        else:
-            preview_df = pd.read_excel(uploaded_file, nrows=10)
-
-        if preview_df.empty or len(preview_df.columns) == 0:
-            st.warning("⚠️ Uploaded file has no readable columns. Please check the format.")
-        else:
-            st.caption("🔍 Preview of Internal Data:")
-            st.dataframe(preview_df)
-    except Exception as e:
-        st.error(f"⚠️ Could not preview file: {e}")
 
 progress_placeholder = st.empty()
 
@@ -183,8 +146,8 @@ if uploaded_file and sheet_url and date_filter and run_button:
             st.stop()
 
         internal_raw['Date of Sale'] = pd.to_datetime(internal_raw['Date of Sale'], errors='coerce')
-        internal_raw = internal_raw[internal_raw['Date of Sale'].dt.date == date_filter]
-        summarized_internal = summarize_internal_data(internal_raw)
+        filtered_internal = internal_raw[internal_raw['Date of Sale'].dt.date == date_filter]
+        summarized_internal = summarize_internal_data(filtered_internal)
         st.write("✅ Internal Product Counts:", summarized_internal[['Internet', 'TV', 'Phone']].sum().to_dict())
         progress_bar.progress(50, text="✅ Internal data processed.")
 
