@@ -65,7 +65,7 @@ TV_KEYWORDS = [
 PHONE_KEYWORDS = ["Freedom", "Basic", "Landline Phone"]
 
 def match_product(product, keywords):
-    return any(k.lower() in str(product).lower() for k in keywords)
+    return any(k in str(product) for k in keywords)  # Case-sensitive match
 
 def summarize_internal_data(df):
     debug_internal_headers = list(df.columns)
