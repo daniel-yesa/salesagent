@@ -111,23 +111,18 @@ def compare_sales(internal_df, client_df, date_filter):
     else:
         account_date_map = {}
 
-    def reason_logic(row):
-        client_in_sheet = row['Account Number'] in client_df['Account Number'].values
-        matched_date = False
-        if client_in_sheet and row['Account Number'] in account_date_map:
-            client_date = account_date_map[row['Account Number']]
-            if pd.notnull(client_date):
-                input_date_str = date_filter.strftime('%-m/%-d/%Y')
-                matched_date = (
-                    client_date.strftime('%-m/%-d/%Y') == input_date_str or
-                    client_date.strftime('%#m/%#d/%Y') == input_date_str or
-                    client_date.strftime('%m/%d/%Y') == input_date_str
-                )
+    input_date_str = date_filter.strftime('%-m/%-d/%Y').lstrip('0').replace('/0', '/')
 
-        if pd.isnull(row['Internet_Client']) and matched_date:
+    def reason_logic(row):
+        acct = row['Account Number']
+        client_date = account_date_map.get(acct)
+
+        if pd.isnull(row['Internet_Client']) and acct in account_date_map:
+            if pd.notnull(client_date):
+                client_date_str = client_date.strftime('%-m/%-d/%Y').lstrip('0').replace('/0', '/')
+                if client_date_str != input_date_str:
+                    return "Missing from report - wrong day"
             return "Missing from report"
-        elif pd.isnull(row['Internet_Client']) and not matched_date:
-            return "Missing from report - wrong day"
         elif row['Internet_YESA'] != row['Internet_Client'] or row['TV_YESA'] != row['TV_Client'] or row['Phone_YESA'] != row['Phone_Client']:
             return "PSU - no match"
         else:
@@ -147,7 +142,7 @@ with st.expander("🔧 Configure and Run", expanded=True):
     sheet_url = st.text_input("🔗 Paste Client Google Sheet URL", value="https://docs.google.com/spreadsheets/d/1tamMxhdJ-_wuyCrmu9mK6RiVj1lZsUJBSm0gSBbjQwM/edit?gid=1075311190")
     date_filter = st.date_input("🗕️ Choose Sale Date", value=None)
     if date_filter:
-        st.caption(f"📅 You selected: {date_filter.strftime('%-m/%-d/%Y')}")
+        st.caption(f"📅 You selected: {date_filter.strftime('%-m/%-d/%Y').lstrip('0').replace('/0','/')}")
     run_button = st.button("🚀 Run Data Comparison")
 
 progress_placeholder = st.empty()
