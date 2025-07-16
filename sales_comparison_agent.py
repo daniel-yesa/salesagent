@@ -10,6 +10,8 @@ import io
 # --- Setup Google Sheets API ---
 scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
 
+log = []  # For debugging log
+
 def load_gsheet(sheet_url):
     json_creds = json.loads(st.secrets["GOOGLE_SERVICE_ACCOUNT_JSON"])
     creds = Credentials.from_service_account_info(json_creds, scopes=scope)
@@ -97,6 +99,8 @@ def compare_sales(internal_df, client_df):
     merged = pd.merge(internal_df, client_df, on='Account Number', how='left', suffixes=('_YESA', '_Client'))
     merged['Client Account Number'] = merged['Account Number']  # duplicate for clarity
 
+    log.append(f"🔍 Merging {len(internal_df)} internal rows with {len(client_df)} client rows")
+
     merged['Reason'] = merged.apply(
         lambda row: "Missing from report" if pd.isnull(row['Internet_Client'])
         else ("PSU - no match" if (row['Internet_YESA'] != row['Internet_Client'] or
@@ -104,7 +108,6 @@ def compare_sales(internal_df, client_df):
                                    row['Phone_YESA'] != row['Phone_Client']) else None), axis=1)
 
     mismatches = merged[merged['Reason'].notnull()]
-
     return mismatches
 
 # --- Streamlit UI ---
@@ -205,6 +208,9 @@ if uploaded_file and sheet_url and date_filter and run_button:
             ]
             st.dataframe(mismatches[show_cols], use_container_width=True)
             st.download_button("⬇️ Download Results", mismatches[show_cols].to_csv(index=False), "mismatches.csv")
+
+        if log:
+            st.expander("🛠 Debug Log").write("\n".join(log))
 
     except Exception as e:
         st.exception(e)
