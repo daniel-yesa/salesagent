@@ -105,13 +105,16 @@ def compare_sales(internal_df, client_df, start_date, end_date):
 
     if date_column_found:
         client_df[date_column_found] = pd.to_datetime(client_df[date_column_found], errors='coerce')
+        account_all_dates = client_df.groupby('Account Number')[date_column_found].apply(list).to_dict()
         account_date_map = client_df.set_index('Account Number')[date_column_found].to_dict()
     else:
+        account_all_dates = {}
         account_date_map = {}
 
     def reason_logic(row):
         acct = row['Account Number']
         client_date = account_date_map.get(acct)
+        all_dates = account_all_dates.get(acct, [])
         products_missing = all(pd.isnull(row.get(f + '_Client')) for f in ['Internet', 'TV', 'Phone'])
 
         # 1. Missing from report
@@ -122,8 +125,8 @@ def compare_sales(internal_df, client_df, start_date, end_date):
         if any(row.get(f + '_YESA') != row.get(f + '_Client') for f in ['Internet', 'TV', 'Phone']):
             return "PSU - no match"
 
-        # 3. Wrong date
-        if pd.notnull(client_date) and not (start_date <= client_date.date() <= end_date):
+        # 3. Wrong date — only if *none* of the account's client entries are in range
+        if all(pd.notnull(d) and not (start_date <= d.date() <= end_date) for d in all_dates):
             return "Missing from report - Wrong date"
 
         return None
