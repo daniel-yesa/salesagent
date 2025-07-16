@@ -34,13 +34,11 @@ def load_gsheet(sheet_url):
     debug_headers = list(df.columns)
     st.text(f"🔍 PSUReport Headers Detected: {debug_headers}")
 
-    if "Billing Account Number" in df.columns:
-        df.rename(columns={"Billing Account Number": "Account Number"}, inplace=True)
+    if "Billing Account Number" not in df.columns:
+        raise ValueError(f"❌ Column 'Billing Account Number' is missing from PSUReport tab. Found columns: {debug_headers}")
 
-    if "Account Number" not in df.columns:
-        raise ValueError(f"❌ Column 'Account Number' is missing from PSUReport tab. Found columns: {debug_headers}")
-
-    df["Account Number"] = df["Account Number"].astype(str).str.strip()
+    df["Billing Account Number"] = df["Billing Account Number"].astype(str).str.strip()
+    df.rename(columns={"Billing Account Number": "Account Number"}, inplace=True)
 
     for col in ["Internet", "TV", "Phone"]:
         if col not in df.columns:
