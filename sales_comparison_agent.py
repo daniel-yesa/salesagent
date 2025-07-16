@@ -15,7 +15,14 @@ def load_gsheet(sheet_url):
     creds = Credentials.from_service_account_info(json_creds, scopes=scope)
     client = gspread.authorize(creds)
     sheet = client.open_by_url(sheet_url)
-    worksheet = sheet.sheet1
+
+    sheet_titles = [ws.title for ws in sheet.worksheets()]
+    st.info(f"📄 Sheets found in workbook: {sheet_titles}")
+
+    if "PSUReport" in sheet_titles:
+        worksheet = sheet.worksheet("PSUReport")
+    else:
+        raise ValueError(f"❌ 'PSUReport' tab not found. Found tabs: {sheet_titles}")
 
     rows = worksheet.get_all_values()
     header_row_index = next((i for i, row in enumerate(rows) if any(cell.strip() for cell in row)), 0)
@@ -25,13 +32,13 @@ def load_gsheet(sheet_url):
     df = pd.DataFrame(data_rows, columns=headers)
 
     debug_headers = list(df.columns)
-    st.text(f"🔍 Client Sheet Headers Detected: {debug_headers}")
+    st.text(f"🔍 PSUReport Headers Detected: {debug_headers}")
 
     if "Billing Account Number" in df.columns:
         df.rename(columns={"Billing Account Number": "Account Number"}, inplace=True)
 
     if "Account Number" not in df.columns:
-        raise ValueError(f"❌ Column 'Account Number' is missing from client data. Found columns: {debug_headers}")
+        raise ValueError(f"❌ Column 'Account Number' is missing from PSUReport tab. Found columns: {debug_headers}")
 
     for col in ["Internet", "TV", "Phone"]:
         if col not in df.columns:
