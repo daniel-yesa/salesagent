@@ -47,6 +47,24 @@ def load_gsheet(sheet_url):
     return df
 
 # --- Product extraction for internal data ---
+INTERNET_KEYWORDS = [
+    "1 Gig", "500 Mbps", "200 Mbps", "100 Mbps",
+    "UltraFibre 60 - Unlimited", "UltraFibre 90 - Unlimited",
+    "UltraFibre 120 - Unlimited", "UltraFibre 180 - Unlimited",
+    "UltraFibre 360 - Unlimited", "UltraFibre 1Gig - Unlimited",
+    "UltraFibre 2Gig - Unlimited"
+]
+
+TV_KEYWORDS = [
+    "Stream Box", "Family +", "Variety +", "Entertainment +", "Locals +",
+    "Supreme package", "epico x-streme", "epico plus", "epico intro", "epico basic"
+]
+
+PHONE_KEYWORDS = ["Freedom", "Basic", "Landline Phone"]
+
+def match_product(product, keywords):
+    return any(k.lower() in str(product).lower() for k in keywords)
+
 def summarize_internal_data(df):
     debug_internal_headers = list(df.columns)
     if "Billing Account Number" in df.columns and "Account Number" not in df.columns:
@@ -57,9 +75,10 @@ def summarize_internal_data(df):
 
     df["Account Number"] = df["Account Number"].astype(str).str.strip()
 
-    df['Internet'] = df['Product Name'].str.contains("INT", case=False, na=False).astype(int)
-    df['TV'] = df['Product Name'].str.contains("TV", case=False, na=False).astype(int)
-    df['Phone'] = df['Product Name'].str.contains("HP", case=False, na=False).astype(int)
+    df['Internet'] = df['Product Name'].apply(lambda x: int(match_product(x, INTERNET_KEYWORDS)))
+    df['TV'] = df['Product Name'].apply(lambda x: int(match_product(x, TV_KEYWORDS)))
+    df['Phone'] = df['Product Name'].apply(lambda x: int(match_product(x, PHONE_KEYWORDS)))
+
     summary = df.groupby('Account Number')[['Internet', 'TV', 'Phone']].max().reset_index()
     return summary
 
@@ -159,6 +178,7 @@ if uploaded_file and sheet_url and date_filter and run_button:
         internal_raw['Date of Sale'] = pd.to_datetime(internal_raw['Date of Sale'], errors='coerce')
         internal_raw = internal_raw[internal_raw['Date of Sale'].dt.date == date_filter]
         summarized_internal = summarize_internal_data(internal_raw)
+        st.write("✅ Internal Product Counts:", summarized_internal[['Internet', 'TV', 'Phone']].sum().to_dict())
         progress_bar.progress(50, text="✅ Internal data processed.")
 
         with st.spinner("📥 Loading client Google Sheet data..."):
