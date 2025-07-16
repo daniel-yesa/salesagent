@@ -23,21 +23,30 @@ def load_gsheet(sheet_url):
     data_rows = rows[header_row_index + 1:]
 
     df = pd.DataFrame(data_rows, columns=headers)
+
+    debug_headers = list(df.columns)
+    st.text(f"🔍 Client Sheet Headers Detected: {debug_headers}")
+
     if "Billing Account Number" in df.columns:
         df.rename(columns={"Billing Account Number": "Account Number"}, inplace=True)
+
+    if "Account Number" not in df.columns:
+        raise ValueError(f"❌ Column 'Account Number' is missing from client data. Found columns: {debug_headers}")
 
     for col in ["Internet", "TV", "Phone"]:
         if col not in df.columns:
             df[col] = ""
+
     return df
 
 # --- Product extraction for internal data ---
 def summarize_internal_data(df):
+    debug_internal_headers = list(df.columns)
     if "Billing Account Number" in df.columns and "Account Number" not in df.columns:
         df.rename(columns={"Billing Account Number": "Account Number"}, inplace=True)
 
     if "Account Number" not in df.columns:
-        raise ValueError("The internal data must contain an 'Account Number' column.")
+        raise ValueError(f"❌ The internal data must contain an 'Account Number' column. Found columns: {debug_internal_headers}")
 
     df['Internet'] = df['Product Name'].str.contains("INT", case=False, na=False).astype(int)
     df['TV'] = df['Product Name'].str.contains("TV", case=False, na=False).astype(int)
@@ -157,6 +166,7 @@ if uploaded_file and sheet_url and date_filter and run_button:
             st.download_button("⬇️ Download Results", mismatches.to_csv(index=False), "mismatches.csv")
 
     except Exception as e:
+        st.exception(e)
         st.error(f"⚠️ An error occurred: {str(e)}")
 else:
     st.info("ℹ️ Upload a CSV or Excel file, enter a Google Sheet URL, and select a date to start.")
