@@ -15,25 +15,30 @@ log = []
 st.set_page_config(page_title="MatchMate | YESA", layout="wide")
 st.markdown("""
     <style>
-        .main { background-color: #f8f9fa; }
-        .block-container { padding-top: 2rem; padding-bottom: 2rem; }
+        html, body, [class*="css"]  {
+            font-family: 'Segoe UI', sans-serif;
+            color: #333333;
+        }
+        .main { background-color: #fefefe; }
+        .block-container { padding-top: 2rem; padding-bottom: 2rem; max-width: 1000px; margin: auto; }
         .metric-box {
             padding: 1rem; border-radius: 12px;
-            background-color: #ffffff;
-            box-shadow: 0 0 8px rgba(0,0,0,0.05);
+            background-color: #e9f5ff;
+            box-shadow: 0 0 8px rgba(0,0,0,0.03);
             text-align: center; font-size: 1.2rem;
         }
-        .metric-title { color: grey; font-size: 0.85rem; }
+        .metric-title { color: #5a5a5a; font-size: 0.85rem; }
         .metric-value { font-weight: 600; font-size: 1.5rem; }
+        .small-upload .stFileUploader { max-width: 300px !important; margin: auto; }
     </style>
 """, unsafe_allow_html=True)
 
 st.markdown("""
-    <h1 style='text-align: center;'>🤖 MatchMate</h1>
-    <p style='text-align: center; color: grey; font-size:18px;'>
-        Reconcile YESA internal sales with PSU-reported client data seamlessly.
+    <h1 style='text-align: center; font-size: 2.8rem;'>🤖 MatchMate</h1>
+    <p style='text-align: center; color: #666666; font-size:17px;'>
+        Your sleek companion for reconciling YESA internal sales with PSU-reported client data.
     </p>
-    <hr>
+    <hr style='margin-top: 0.5rem;'>
 """, unsafe_allow_html=True)
 
 # --- Google Sheet Loader ---
@@ -44,8 +49,6 @@ def load_gsheet(sheet_url):
     sheet = client.open_by_url(sheet_url)
 
     sheet_titles = [ws.title for ws in sheet.worksheets()]
-    st.info(f"📄 Sheets found in workbook: {sheet_titles}")
-
     if "PSUReport" not in sheet_titles:
         raise ValueError(f"❌ 'PSUReport' tab not found. Found tabs: {sheet_titles}")
 
@@ -133,12 +136,12 @@ def compare_sales(internal_df, client_df, start_date, end_date):
 st.markdown("### ⚙️ Configure Comparison")
 with st.container():
     with st.form("config_form"):
-        col1, col2 = st.columns(2)
+        col1, col2, col3 = st.columns([1.5, 1, 1])
         uploaded_file = col1.file_uploader("Internal Sales CSV or Excel", type=["csv", "xlsx"])
         sheet_url = col2.text_input("Client Google Sheet URL")
-        col3, col4 = st.columns(2)
-        start_date = col3.date_input("Start Date")
-        end_date = col4.date_input("End Date")
+        with col3:
+            start_date = st.date_input("Start Date")
+            end_date = st.date_input("End Date")
         submitted = st.form_submit_button("🚀 Run Comparison")
 
 if uploaded_file and sheet_url and start_date and end_date and submitted:
