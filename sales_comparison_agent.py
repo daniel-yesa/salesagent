@@ -117,7 +117,12 @@ def compare_sales(internal_df, client_df, date_filter):
         if client_in_sheet and row['Account Number'] in account_date_map:
             client_date = account_date_map[row['Account Number']]
             if pd.notnull(client_date):
-                matched_date = client_date.date() == date_filter
+                try:
+                    client_date_str = client_date.strftime('%-m/%d/%Y')
+                except:
+                    client_date_str = client_date.strftime('%m/%d/%Y')
+                input_date_str = date_filter.strftime('%-m/%d/%Y') if date_filter.month < 10 else date_filter.strftime('%m/%d/%Y')
+                matched_date = client_date_str == input_date_str
 
         if pd.isnull(row['Internet_Client']) and matched_date:
             return "Missing from report"
@@ -139,7 +144,7 @@ st.write("Easily validate internal sales data with client-reported records.")
 
 with st.expander("🔧 Configure and Run", expanded=True):
     uploaded_file = st.file_uploader("📄 Upload Internal Sales CSV or Excel", type=["csv", "xlsx"])
-    sheet_url = st.text_input("🔗 Paste Client Google Sheet URL", value="https://docs.google.com/spreadsheets/d/1tamMxhdJ-_wuyCrmu9mK6RiVj1lZsUJBSm0gSBbjQwM/edit?gid=1075311190#gid=1075311190")
+    sheet_url = st.text_input("🔗 Paste Client Google Sheet URL", value="https://docs.google.com/spreadsheets/d/1tamMxhdJ-_wuyCrmu9mK6RiVj1lZsUJBSm0gSBbjQwM/edit?gid=1075311190")
     date_filter = st.date_input("🗕️ Choose Sale Date", value=None)
     run_button = st.button("🚀 Run Data Comparison")
 
