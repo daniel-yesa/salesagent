@@ -127,6 +127,13 @@ def compare_sales(internal_df, client_df, start_date, end_date):
 
     merged['Reason'] = merged.apply(reason_logic, axis=1)
     mismatches = merged[merged['Reason'].notnull()]
+
+    # Add "(addon)" if Account Number appears more than once
+    addon_accounts = mismatches['Account Number'].value_counts()
+    mismatches['Reason'] = mismatches.apply(
+        lambda row: row['Reason'] + " (addon)" if addon_accounts[row['Account Number']] > 1 else row['Reason'], axis=1
+    )
+
     return mismatches
 
 # --- Streamlit UI ---
