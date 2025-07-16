@@ -40,6 +40,8 @@ def load_gsheet(sheet_url):
     if "Account Number" not in df.columns:
         raise ValueError(f"❌ Column 'Account Number' is missing from PSUReport tab. Found columns: {debug_headers}")
 
+    df["Account Number"] = df["Account Number"].astype(str).str.strip()
+
     for col in ["Internet", "TV", "Phone"]:
         if col not in df.columns:
             df[col] = ""
@@ -54,6 +56,8 @@ def summarize_internal_data(df):
 
     if "Account Number" not in df.columns:
         raise ValueError(f"❌ The internal data must contain an 'Account Number' column. Found columns: {debug_internal_headers}")
+
+    df["Account Number"] = df["Account Number"].astype(str).str.strip()
 
     df['Internet'] = df['Product Name'].str.contains("INT", case=False, na=False).astype(int)
     df['TV'] = df['Product Name'].str.contains("TV", case=False, na=False).astype(int)
@@ -70,6 +74,9 @@ def normalize_client_data(df):
 
 # --- Comparison logic ---
 def compare_sales(internal_df, client_df):
+    internal_df['Account Number'] = internal_df['Account Number'].astype(str)
+    client_df['Account Number'] = client_df['Account Number'].astype(str)
+
     merged = pd.merge(internal_df, client_df, on='Account Number', how='left', suffixes=('_int', '_client'))
     mismatches = merged[(merged['Internet_int'] != merged['Internet_client']) |
                         (merged['TV_int'] != merged['TV_client']) |
