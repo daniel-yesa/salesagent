@@ -9,7 +9,6 @@ import io
 
 # --- Setup Google Sheets API ---
 scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
-
 log = []  # For debugging log
 
 def load_gsheet(sheet_url):
@@ -92,16 +91,15 @@ def normalize_client_data(df):
     return df
 
 # --- Comparison logic ---
-def compare_sales(internal_df, client_df, date_filter):
+def compare_sales(internal_df, client_df, start_date, end_date):
     internal_df['Account Number'] = internal_df['Account Number'].astype(str)
     client_df['Account Number'] = client_df['Account Number'].astype(str)
 
     merged = pd.merge(internal_df, client_df, on='Account Number', how='left', suffixes=('_YESA', '_Client'))
-    merged['Client Account Number'] = merged['Account Number']  # duplicate for clarity
+    merged['Client Account Number'] = merged['Account Number']
 
     log.append(f"🔍 Merging {len(internal_df)} internal rows with {len(client_df)} client rows")
 
-    # Identify possible date columns
     date_columns = ['Day of First Submit Date', 'Open Date', 'Jour de First Submit Date']
     date_column_found = next((col for col in date_columns if col in client_df.columns), None)
 
@@ -111,22 +109,24 @@ def compare_sales(internal_df, client_df, date_filter):
     else:
         account_date_map = {}
 
-    input_date_str = date_filter.strftime('%-m/%-d/%Y').lstrip('0').replace('/0', '/')
-
     def reason_logic(row):
         acct = row['Account Number']
         client_date = account_date_map.get(acct)
+        products_missing = all(pd.isnull(row.get(f + '_Client')) for f in ['Internet', 'TV', 'Phone'])
 
-        if pd.isnull(row['Internet_Client']) and acct in account_date_map:
-            if pd.notnull(client_date):
-                client_date_str = client_date.strftime('%-m/%-d/%Y').lstrip('0').replace('/0', '/')
-                if client_date_str != input_date_str:
-                    return "Missing from report - wrong day"
+        # 1. Missing from report
+        if acct not in account_date_map or products_missing:
             return "Missing from report"
-        elif row['Internet_YESA'] != row['Internet_Client'] or row['TV_YESA'] != row['TV_Client'] or row['Phone_YESA'] != row['Phone_Client']:
+
+        # 2. PSU mismatch
+        if any(row.get(f + '_YESA') != row.get(f + '_Client') for f in ['Internet', 'TV', 'Phone']):
             return "PSU - no match"
-        else:
-            return None
+
+        # 3. Wrong date
+        if pd.notnull(client_date) and not (start_date <= client_date.date() <= end_date):
+            return "Missing from report - Wrong date"
+
+        return None
 
     merged['Reason'] = merged.apply(reason_logic, axis=1)
     mismatches = merged[merged['Reason'].notnull()]
@@ -139,15 +139,22 @@ st.write("Easily validate internal sales data with client-reported records.")
 
 with st.expander("🔧 Configure and Run", expanded=True):
     uploaded_file = st.file_uploader("📄 Upload Internal Sales CSV or Excel", type=["csv", "xlsx"])
-    sheet_url = st.text_input("🔗 Paste Client Google Sheet URL", value="https://docs.google.com/spreadsheets/d/1tamMxhdJ-_wuyCrmu9mK6RiVj1lZsUJBSm0gSBbjQwM/edit?gid=1075311190")
-    date_filter = st.date_input("🗕️ Choose Sale Date", value=None)
-    if date_filter:
-        st.caption(f"📅 You selected: {date_filter.strftime('%-m/%-d/%Y').lstrip('0').replace('/0','/')}")
+    sheet_url = st.text_input("🔗 Paste Client Google Sheet URL", value="")
+
+    col1, col2 = st.columns(2)
+    with col1:
+        start_date = st.date_input("📅 Start Date")
+    with col2:
+        end_date = st.date_input("📅 End Date")
+
+    if start_date and end_date:
+        st.caption(f"📅 Comparing records from **{start_date}** to **{end_date}**")
+
     run_button = st.button("🚀 Run Data Comparison")
 
 progress_placeholder = st.empty()
 
-if uploaded_file and sheet_url and date_filter and run_button:
+if uploaded_file and sheet_url and start_date and end_date and run_button:
     try:
         progress_bar = progress_placeholder.progress(0, text="⏳ Starting comparison...")
 
@@ -165,7 +172,10 @@ if uploaded_file and sheet_url and date_filter and run_button:
             st.stop()
 
         internal_raw['Date of Sale'] = pd.to_datetime(internal_raw['Date of Sale'], errors='coerce')
-        filtered_internal = internal_raw[internal_raw['Date of Sale'].dt.date == date_filter]
+        filtered_internal = internal_raw[
+            (internal_raw['Date of Sale'].dt.date >= start_date) &
+            (internal_raw['Date of Sale'].dt.date <= end_date)
+        ]
         summarized_internal = summarize_internal_data(filtered_internal)
         st.write("✅ Internal Product Counts:", summarized_internal[['Internet', 'TV', 'Phone']].sum().to_dict())
         progress_bar.progress(50, text="✅ Internal data processed.")
@@ -175,14 +185,14 @@ if uploaded_file and sheet_url and date_filter and run_button:
             client_df = normalize_client_data(client_df)
         progress_bar.progress(75, text="✅ Client data loaded.")
 
-        mismatches = compare_sales(summarized_internal, client_df, date_filter)
+        mismatches = compare_sales(summarized_internal, client_df, start_date, end_date)
         progress_bar.progress(100, text="🎯 Comparison complete!")
         time.sleep(0.5)
         progress_placeholder.empty()
 
         st.subheader("📋 Mismatched Accounts")
         if mismatches.empty:
-            st.success("🎉 All records matched correctly for the selected date!")
+            st.success("🎉 All records matched correctly for the selected date range!")
         else:
             show_cols = [
                 "Reason", "Account Number", "Internet_YESA", "TV_YESA", "Phone_YESA",
@@ -198,4 +208,4 @@ if uploaded_file and sheet_url and date_filter and run_button:
         st.exception(e)
         st.error(f"⚠️ An error occurred: {str(e)}")
 else:
-    st.info("ℹ️ Upload a CSV or Excel file, enter a Google Sheet URL, and select a date to start.")
+    st.info("ℹ️ Upload a CSV or Excel file, enter a Google Sheet URL, and select a start and end date to begin.")
