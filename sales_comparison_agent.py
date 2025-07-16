@@ -75,11 +75,13 @@ def compare_sales(internal_df, client_df):
     internal_df['Account Number'] = internal_df['Account Number'].astype(str)
     client_df['Account Number'] = client_df['Account Number'].astype(str)
 
-    merged = pd.merge(internal_df, client_df, on='Account Number', how='left', suffixes=('_int', '_client'))
-    mismatches = merged[(merged['Internet_int'] != merged['Internet_client']) |
-                        (merged['TV_int'] != merged['TV_client']) |
-                        (merged['Phone_int'] != merged['Phone_client']) |
-                        (merged['Internet_client'].isnull())]
+    merged = pd.merge(internal_df, client_df, on='Account Number', how='left', suffixes=('_YESA', '_Client'))
+
+    mismatches = merged[(merged['Internet_YESA'] != merged['Internet_Client']) |
+                        (merged['TV_YESA'] != merged['TV_Client']) |
+                        (merged['Phone_YESA'] != merged['Phone_Client']) |
+                        (merged['Internet_Client'].isnull())]
+
     return mismatches
 
 # --- Streamlit UI ---
@@ -112,9 +114,9 @@ st.title("💼 Sales Comparison Agent")
 st.write("Easily validate internal sales data with client-reported records.")
 
 with st.expander("🔧 Configure and Run", expanded=True):
-    uploaded_file = st.file_uploader("📤 Upload Internal Sales CSV or Excel", type=["csv", "xlsx"])
+    uploaded_file = st.file_uploader("📄 Upload Internal Sales CSV or Excel", type=["csv", "xlsx"])
     sheet_url = st.text_input("🔗 Paste Client Google Sheet URL")
-    date_filter = st.date_input("📅 Choose Sale Date", value=None)
+    date_filter = st.date_input("🗕️ Choose Sale Date", value=None)
     run_button = st.button("🚀 Run Data Comparison")
 
 if uploaded_file:
@@ -141,7 +143,6 @@ if uploaded_file and sheet_url and date_filter and run_button:
     try:
         progress_bar = progress_placeholder.progress(0, text="⏳ Starting comparison...")
 
-        # Load and process internal data
         if uploaded_file.name.endswith(".csv"):
             content = uploaded_file.read().decode("utf-8", errors="ignore")
             lines = [line for line in content.splitlines() if line.strip() != ""]
@@ -174,8 +175,12 @@ if uploaded_file and sheet_url and date_filter and run_button:
         if mismatches.empty:
             st.success("🎉 All records matched correctly for the selected date!")
         else:
-            st.dataframe(mismatches, use_container_width=True)
-            st.download_button("⬇️ Download Results", mismatches.to_csv(index=False), "mismatches.csv")
+            show_cols = [
+                "Account Number", "Internet_YESA", "TV_YESA", "Phone_YESA",
+                "Internet_Client", "TV_Client", "Phone_Client"
+            ]
+            st.dataframe(mismatches[show_cols], use_container_width=True)
+            st.download_button("⬇️ Download Results", mismatches[show_cols].to_csv(index=False), "mismatches.csv")
 
     except Exception as e:
         st.exception(e)
