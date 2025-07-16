@@ -92,7 +92,7 @@ def normalize_client_data(df):
     return df
 
 # --- Comparison logic ---
-def compare_sales(internal_df, client_df):
+def compare_sales(internal_df, client_df, date_filter):
     internal_df['Account Number'] = internal_df['Account Number'].astype(str)
     client_df['Account Number'] = client_df['Account Number'].astype(str)
 
@@ -101,11 +101,28 @@ def compare_sales(internal_df, client_df):
 
     log.append(f"🔍 Merging {len(internal_df)} internal rows with {len(client_df)} client rows")
 
+    # Identify possible date columns
+    date_columns = ['Day of First Submit Date', 'Open Date', 'Jour de First Submit Date']
+    date_column_found = next((col for col in date_columns if col in client_df.columns), None)
+
+    if date_column_found:
+        client_df[date_column_found] = pd.to_datetime(client_df[date_column_found], errors='coerce')
+        account_date_map = client_df.set_index('Account Number')[date_column_found].to_dict()
+    else:
+        account_date_map = {}
+
     def reason_logic(row):
-        if pd.isnull(row['Internet_Client']) and row['Account Number'] in client_df['Account Number'].values:
-            return "Missing from report (wrong day)"
-        elif pd.isnull(row['Internet_Client']):
+        client_in_sheet = row['Account Number'] in client_df['Account Number'].values
+        matched_date = False
+        if client_in_sheet and row['Account Number'] in account_date_map:
+            client_date = account_date_map[row['Account Number']]
+            if pd.notnull(client_date):
+                matched_date = client_date.date() == date_filter
+
+        if pd.isnull(row['Internet_Client']) and matched_date:
             return "Missing from report"
+        elif pd.isnull(row['Internet_Client']) and not matched_date:
+            return "Missing from report - wrong day"
         elif row['Internet_YESA'] != row['Internet_Client'] or row['TV_YESA'] != row['TV_Client'] or row['Phone_YESA'] != row['Phone_Client']:
             return "PSU - no match"
         else:
@@ -156,7 +173,7 @@ if uploaded_file and sheet_url and date_filter and run_button:
             client_df = normalize_client_data(client_df)
         progress_bar.progress(75, text="✅ Client data loaded.")
 
-        mismatches = compare_sales(summarized_internal, client_df)
+        mismatches = compare_sales(summarized_internal, client_df, date_filter)
         progress_bar.progress(100, text="🎯 Comparison complete!")
         time.sleep(0.5)
         progress_placeholder.empty()
