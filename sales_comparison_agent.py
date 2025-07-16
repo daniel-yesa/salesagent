@@ -45,13 +45,6 @@ def load_gsheet(sheet_url):
         if col not in df.columns:
             df[col] = ""
 
-    if "SO Status" in df.columns:
-        df["SO Status"] = df["SO Status"].astype(str).str.strip()
-        df[['Internet', 'TV', 'Phone']] = df[['Internet', 'TV', 'Phone']].applymap(lambda x: 1 if str(x).strip() else 0)
-        df = df.groupby(['Account Number', 'SO Status'], as_index=False)[['Internet', 'TV', 'Phone']].max()
-    else:
-        raise ValueError("❌ Column 'SO Status' is missing from PSUReport tab. Cannot merge records reliably.")
-
     return df
 
 INTERNET_KEYWORDS = [
