@@ -17,7 +17,6 @@ def load_gsheet(sheet_url):
     sheet = client.open_by_url(sheet_url)
     worksheet = sheet.sheet1
 
-    # Find first row with real headers
     rows = worksheet.get_all_values()
     header_row_index = next((i for i, row in enumerate(rows) if any(cell.strip() for cell in row)), 0)
     headers = rows[header_row_index]
@@ -100,17 +99,20 @@ with st.expander("🔧 Configure and Run", expanded=True):
 if uploaded_file:
     try:
         if uploaded_file.name.endswith(".csv"):
-            internal_preview = pd.read_csv(uploaded_file, nrows=5)
+            content = uploaded_file.read().decode("utf-8", errors="ignore")
+            lines = [line for line in content.splitlines() if line.strip() != ""]
+            preview_df = pd.read_csv(io.StringIO("\n".join(lines[:10])))
+            uploaded_file.seek(0)
         else:
-            internal_preview = pd.read_excel(uploaded_file, nrows=5)
+            preview_df = pd.read_excel(uploaded_file, nrows=10)
 
-        if internal_preview.empty or len(internal_preview.columns) == 0:
+        if preview_df.empty or len(preview_df.columns) == 0:
             st.warning("⚠️ Uploaded file has no readable columns. Please check the format.")
         else:
             st.caption("🔍 Preview of Internal Data:")
-            st.dataframe(internal_preview)
+            st.dataframe(preview_df)
     except Exception as e:
-        st.error(f"⚠️ Could not read file: {e}")
+        st.error(f"⚠️ Could not preview file: {e}")
 
 progress_placeholder = st.empty()
 
@@ -120,7 +122,9 @@ if uploaded_file and sheet_url and date_filter and run_button:
 
         # Load and process internal data
         if uploaded_file.name.endswith(".csv"):
-            internal_raw = pd.read_csv(uploaded_file)
+            content = uploaded_file.read().decode("utf-8", errors="ignore")
+            lines = [line for line in content.splitlines() if line.strip() != ""]
+            internal_raw = pd.read_csv(io.StringIO("\n".join(lines)))
         else:
             internal_raw = pd.read_excel(uploaded_file)
 
@@ -135,19 +139,16 @@ if uploaded_file and sheet_url and date_filter and run_button:
         summarized_internal = summarize_internal_data(internal_raw)
         progress_bar.progress(50, text="✅ Internal data processed.")
 
-        # Load client sheet data
         with st.spinner("📥 Loading client Google Sheet data..."):
             client_df = load_gsheet(sheet_url)
             client_df = normalize_client_data(client_df)
         progress_bar.progress(75, text="✅ Client data loaded.")
 
-        # Perform comparison
         mismatches = compare_sales(summarized_internal, client_df)
         progress_bar.progress(100, text="🎯 Comparison complete!")
         time.sleep(0.5)
         progress_placeholder.empty()
 
-        # Display results
         st.subheader("📋 Mismatched Accounts")
         if mismatches.empty:
             st.success("🎉 All records matched correctly for the selected date!")
