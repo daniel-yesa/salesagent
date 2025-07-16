@@ -95,6 +95,7 @@ def compare_sales(internal_df, client_df):
     client_df['Account Number'] = client_df['Account Number'].astype(str)
 
     merged = pd.merge(internal_df, client_df, on='Account Number', how='left', suffixes=('_YESA', '_Client'))
+    merged['Client Account Number'] = merged['Account Number']  # duplicate for clarity
 
     mismatches = merged[(merged['Internet_YESA'] != merged['Internet_Client']) |
                         (merged['TV_YESA'] != merged['TV_Client']) |
@@ -197,7 +198,7 @@ if uploaded_file and sheet_url and date_filter and run_button:
         else:
             show_cols = [
                 "Account Number", "Internet_YESA", "TV_YESA", "Phone_YESA",
-                "Internet_Client", "TV_Client", "Phone_Client"
+                "Internet_Client", "TV_Client", "Phone_Client", "Client Account Number"
             ]
             st.dataframe(mismatches[show_cols], use_container_width=True)
             st.download_button("⬇️ Download Results", mismatches[show_cols].to_csv(index=False), "mismatches.csv")
