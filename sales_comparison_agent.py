@@ -57,7 +57,7 @@ INTERNET_KEYWORDS = [
 
 TV_KEYWORDS = [
     "Stream Box", "Family +", "Variety +", "Entertainment +", "Locals +",
-    "Supreme package", "epico x-streme", "epico plus", "epico intro", "epico basic"
+    "Supreme package", "epico x-stream", "epico plus", "epico intro", "epico basic"
 ]
 
 PHONE_KEYWORDS = ["Freedom", "Basic", "Landline Phone"]
@@ -97,10 +97,13 @@ def compare_sales(internal_df, client_df):
     merged = pd.merge(internal_df, client_df, on='Account Number', how='left', suffixes=('_YESA', '_Client'))
     merged['Client Account Number'] = merged['Account Number']  # duplicate for clarity
 
-    mismatches = merged[(merged['Internet_YESA'] != merged['Internet_Client']) |
-                        (merged['TV_YESA'] != merged['TV_Client']) |
-                        (merged['Phone_YESA'] != merged['Phone_Client']) |
-                        (merged['Internet_Client'].isnull())]
+    merged['Reason'] = merged.apply(
+        lambda row: "Missing from report" if pd.isnull(row['Internet_Client'])
+        else ("PSU - no match" if (row['Internet_YESA'] != row['Internet_Client'] or
+                                   row['TV_YESA'] != row['TV_Client'] or
+                                   row['Phone_YESA'] != row['Phone_Client']) else None), axis=1)
+
+    mismatches = merged[merged['Reason'].notnull()]
 
     return mismatches
 
@@ -135,7 +138,7 @@ st.write("Easily validate internal sales data with client-reported records.")
 
 with st.expander("🔧 Configure and Run", expanded=True):
     uploaded_file = st.file_uploader("📄 Upload Internal Sales CSV or Excel", type=["csv", "xlsx"])
-    sheet_url = st.text_input("🔗 Paste Client Google Sheet URL")
+    sheet_url = st.text_input("🔗 Paste Client Google Sheet URL", value="https://docs.google.com/spreadsheets/d/1tamMxhdJ-_wuyCrmu9mK6RiVj1lZsUJBSm0gSBbjQwM/edit?gid=1075311190#gid=1075311190")
     date_filter = st.date_input("🗕️ Choose Sale Date", value=None)
     run_button = st.button("🚀 Run Data Comparison")
 
@@ -197,8 +200,8 @@ if uploaded_file and sheet_url and date_filter and run_button:
             st.success("🎉 All records matched correctly for the selected date!")
         else:
             show_cols = [
-                "Account Number", "Internet_YESA", "TV_YESA", "Phone_YESA",
-                "Internet_Client", "TV_Client", "Phone_Client", "Client Account Number"
+                "Reason", "Account Number", "Internet_YESA", "TV_YESA", "Phone_YESA",
+                "Client Account Number", "Internet_Client", "TV_Client", "Phone_Client"
             ]
             st.dataframe(mismatches[show_cols], use_container_width=True)
             st.download_button("⬇️ Download Results", mismatches[show_cols].to_csv(index=False), "mismatches.csv")
