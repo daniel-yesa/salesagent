@@ -8,6 +8,13 @@ import traceback
 
 # --- Streamlit UI ---
 st.set_page_config(page_title="MatchMate | YESA", layout="wide")
+st.markdown("""
+    <style>
+        html, body, [class*="css"] {
+            background-color: #f2f2f2 !important;
+        }
+    </style>
+""", unsafe_allow_html=True)
 st.title("✨ MatchMate - Accounts Missing Finder")
 debug_mode = st.checkbox("🔍 Enable Debug Mode")
 
@@ -137,6 +144,9 @@ if uploaded_file and sheet_url and run_button:
 
             for idx, row in summarized.iterrows():
                 acct = row['Account Number']
+                if acct.startswith("833"):
+                continue  # ⛔️ Skip US accounts
+                acct = row['Account Number']
                 total_checked += 1
                 progress.progress(min(total_checked / len(summarized), 1.0))
 
@@ -193,7 +203,10 @@ if uploaded_file and sheet_url and run_button:
                 st.success("🎉 All records matched!")
             else:
                 st.dataframe(result_df, use_container_width=True)
-                st.download_button("⬇️ Download CSV", result_df.to_csv(index=False), "mismatches.csv")
+                today_str = datetime.today().strftime("%B %d %Y")  # e.g. "July 17 2025"
+                filename = f"Mismatched {today_str}.csv"
+
+                st.download_button("⬇️ Download CSV", result_df.to_csv(index=False), file_name=filename)
 
         except Exception as e:
             st.error("❌ Error occurred during processing.")
