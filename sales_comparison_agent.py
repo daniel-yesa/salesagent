@@ -144,7 +144,12 @@ if uploaded_file and sheet_url and run_button:
                     mismatches.append({'Account Number': acct, 'Reason': 'Missing from report'})
                     continue
 
-                psu = psu_df.loc[acct]
+                psu_row = psu_df.loc[acct]
+                if isinstance(psu_row, pd.DataFrame):
+                    psu = psu_row.iloc[0]
+                else:
+                    psu = psu_row
+
                 reason = None
                 if not (psu['Internet'] == row['Internet'] and psu['TV'] == row['TV'] and psu['Phone'] == row['Phone']):
                     reason = "PSU - no match"
