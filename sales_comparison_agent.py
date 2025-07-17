@@ -268,13 +268,14 @@ if uploaded_file and sheet_url and date_range and run_button:
         duplicate_counts = comparison['Account Number'].value_counts()
         comparison['Reason'] = comparison.apply(lambda row: f"{row['Reason']} (addon)" if duplicate_counts[row['Account Number']] > 1 and pd.notnull(row['Reason']) else row['Reason'], axis=1)
 
+        comparison['Client Account Number'] = comparison['Account Number']
         mismatches = comparison[comparison['Reason'].notnull()]
 
         st.subheader("📋 Mismatched Accounts")
         if mismatches.empty:
             st.success("🎉 All records matched correctly for the selected date range!")
         else:
-            display_cols = ['Reason', 'Account Number', 'Internet_YESA', 'TV_YESA', 'Phone_YESA', 'Internet_Client', 'TV_Client', 'Phone_Client']
+            display_cols = ['Reason', 'Account Number', 'Internet_YESA', 'TV_YESA', 'Phone_YESA', 'Internet_Client', 'TV_Client', 'Phone_Client', 'Client Account Number']
             st.dataframe(mismatches[display_cols], use_container_width=True)
             st.download_button("⬇️ Download Mismatches", mismatches[display_cols].to_csv(index=False), "mismatches.csv")
 
