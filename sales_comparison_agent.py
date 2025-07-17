@@ -1,4 +1,3 @@
-# matchmate_merged_app.py
 import streamlit as st
 import pandas as pd
 import gspread
@@ -20,12 +19,10 @@ INTERNET_KEYWORDS = [
     "UltraFibre 360 - Unlimited", "UltraFibre 1Gig - Unlimited",
     "UltraFibre 2Gig - Unlimited"
 ]
-
 TV_KEYWORDS = [
     "Stream Box", "Family +", "Variety +", "Entertainment +", "Locals +",
     "Supreme package", "epico x-stream", "epico plus", "epico intro", "epico basic"
 ]
-
 PHONE_KEYWORDS = ["Freedom", "Basic", "Landline Phone"]
 
 def match_product(name, keywords):
@@ -35,6 +32,8 @@ def match_product(name, keywords):
 uploaded_file = st.file_uploader("📄 Upload Booked Sales CSV", type=["csv"])
 sheet_url = st.text_input("🔗 Paste Google Sheet URL (Merged PSUReport)")
 start_date, end_date = st.date_input("🗓 Select Date Range", [datetime.today(), datetime.today()])
+
+# --- Preview Sheet ---
 if sheet_url:
     try:
         creds = Credentials.from_service_account_info(
@@ -66,6 +65,7 @@ if sheet_url:
         st.error("❌ Failed to preview PSU sheet.")
         if debug_mode:
             st.exception(e)
+
 run_button = st.button("🚀 Run Missing Report")
 
 # --- Main ---
@@ -89,7 +89,7 @@ if uploaded_file and sheet_url and run_button:
 
             summarized = internal_df.groupby('Account Number')[['Internet', 'TV', 'Phone']].max().reset_index()
 
-            # Load Merged PSUReport
+            # Load and clean PSU sheet
             creds = Credentials.from_service_account_info(
                 json.loads(st.secrets["GOOGLE_SERVICE_ACCOUNT_JSON"]),
                 scopes=["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
@@ -99,63 +99,38 @@ if uploaded_file and sheet_url and run_button:
             rows = worksheet.get_all_values()
             headers = rows[0]
             psu_df = pd.DataFrame(rows[1:], columns=headers)
-            psu_df.columns = psu_df.columns.str.strip()  # ✅ Clean column names
-            
-            # ✅ Required column list
-            required_cols = ["Account Number", "Date of Sale", "Internet", "TV", "Phone"]
+            psu_df.columns = [col.strip() for col in psu_df.columns]
+
+            if debug_mode:
+                st.write("🧠 Columns in PSU sheet:", list(psu_df.columns))
+
+            # Resolve account number column
+            account_col = next((col for col in psu_df.columns if col.strip().lower() == "account number"), None)
+            if not account_col:
+                st.error("❌ 'Account Number' column not found in PSU sheet.")
+                if debug_mode:
+                    st.write("🗂 Available columns:", list(psu_df.columns))
+                st.stop()
+
+            psu_df.rename(columns={account_col: "Account Number"}, inplace=True)
+            psu_df["Account Number"] = psu_df["Account Number"].astype(str).str.strip()
+
+            # Validate other required columns
+            required_cols = ["Date of Sale", "Internet", "TV", "Phone"]
             missing_cols = [col for col in required_cols if col not in psu_df.columns]
-            
             if missing_cols:
-                st.error(f"❌ Merged PSUReport is missing required column(s): {missing_cols}")
+                st.error(f"❌ Missing columns in PSU sheet: {missing_cols}")
                 if debug_mode:
-                    st.write("📋 Found columns in sheet:", list(psu_df.columns))
+                    st.write("🧩 All PSU columns:", list(psu_df.columns))
                 st.stop()
-            
-            # ✅ Safe conversions
-            psu_df['Account Number'] = psu_df['Account Number'].astype(str).str.strip()
-            psu_df['Date of Sale'] = pd.to_datetime(psu_df['Date of Sale'], errors='coerce')
-            
-            for col in ['Internet', 'TV', 'Phone']:
-                psu_df[col] = psu_df[col].apply(lambda x: 1 if str(x).strip() else 0)
-            psu_df = pd.DataFrame(rows[1:], columns=headers)
-            psu_df.columns = psu_df.columns.str.strip()  # ✅ Clean column names
-            
-            # 🔎 Debug: see all columns if needed
-            if debug_mode:
-                st.write("🔍 Columns in PSU sheet:", list(psu_df.columns))
-            
-            # ✅ Validate required columns
-            required_cols = ["Account Number", "Date of Sale", "Internet", "TV", "Phone"]
-            missing = [col for col in required_cols if col not in psu_df.columns]
-            if missing:
-                st.error(f"❌ Merged PSUReport is missing required column(s): {missing}")
-                st.stop()
-            psu_df['Account Number'] = psu_df['Account Number'].astype(str).str.strip()
+
+            # Convert data
             psu_df['Date of Sale'] = pd.to_datetime(psu_df['Date of Sale'], errors='coerce')
             for col in ['Internet', 'TV', 'Phone']:
                 psu_df[col] = psu_df[col].apply(lambda x: 1 if str(x).strip() else 0)
-            
-            if debug_mode:
-                st.write("🔍 Final PSU columns before set_index:", list(psu_df.columns))
+            psu_df = psu_df.set_index("Account Number")
 
-            # Try to find column name that matches 'Account Number' ignoring case/space
-            found_col = next((col for col in psu_df.columns if col.strip().lower() == 'account number'), None)
-            
-            if not found_col:
-                st.error("❌ Could not find a column matching 'Account Number'")
-                if debug_mode:
-                    st.write("🧩 PSU columns are:", list(psu_df.columns))
-                st.stop()
-            
-            psu_df[found_col] = psu_df[found_col].astype(str).str.strip()
-            psu_df = psu_df.set_index(found_col)
-
-            for col in ['Internet', 'TV', 'Phone']:
-                psu_df[col] = psu_df[col].apply(lambda x: 1 if str(x).strip() else 0)
-
-            psu_df = psu_df.set_index('Account Number')
-
-            # Match
+            # Compare
             mismatches = []
             total_checked = 0
             progress = st.progress(0)
