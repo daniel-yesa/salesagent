@@ -124,7 +124,7 @@ def load_gsheet(sheet_url, region):
             'SO Status': 'SO Status'
         },
         'QC': {
-            'Account Number': 'Billing Account Number',
+            'Account Number': 'Customer Account Number',
             'Internet': 'Internet',
             'TV': 'TV',
             'Phone': 'Phone',
@@ -168,7 +168,7 @@ if uploaded_file and sheet_url and date_range and run_button:
             elif "Account No" in internal_df.columns:
                 internal_df.rename(columns={"Account No": "Account Number"}, inplace=True)
             else:
-                st.error("❌ Internal file is missing 'Account Number', 'Billing Account Number', or 'Account No' column.")
+                st.error("❌ Internal file is missing 'Account Number', 'Customer Account Number', 'Billing Account Number', or 'Account No' column.")
                 st.stop()
 
         internal_df['Account Number'] = internal_df['Account Number'].astype(str).str.strip()
