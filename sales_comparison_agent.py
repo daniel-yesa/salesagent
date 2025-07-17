@@ -37,7 +37,8 @@ def match_product(name, keywords):
 
 # --- Inputs ---
 uploaded_file = st.file_uploader("📄 Upload Booked Sales CSV", type=["csv"])
-sheet_url = st.text_input("🔗 Paste Google Sheet URL (Merged PSUReport)")
+default_url = "https://docs.google.com/spreadsheets/d/1tamMxhdJ-_wuyCrmu9mK6RiVj1lZsUJBSm0gSBbjQwM/edit?gid=1075311190#gid=1075311190"
+sheet_url = st.text_input("🔗 Paste Google Sheet URL (Merged PSUReport)", value=default_url)
 start_date, end_date = st.date_input("🗓 Select Date Range", [datetime.today(), datetime.today()])
 
 # --- Preview Sheet ---
