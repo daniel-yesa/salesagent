@@ -124,7 +124,7 @@ def load_gsheet(sheet_url, region):
             'SO Status': 'SO Status'
         },
         'QC': {
-            'Account Number': 'Customer Account Number',
+            'Account Number': 'Billing Account Number',
             'Internet': 'Internet',
             'TV': 'TV',
             'Phone': 'Phone',
@@ -168,17 +168,19 @@ if uploaded_file and sheet_url and date_range and run_button:
             elif "Account No" in internal_df.columns:
                 internal_df.rename(columns={"Account No": "Account Number"}, inplace=True)
             else:
-                st.error("❌ Internal file is missing 'Account Number', 'Customer Account Number', 'Billing Account Number', or 'Account No' column.")
+                st.error("❌ Internal file is missing 'Account Number', 'Billing Account Number', or 'Account No' column.")
                 st.stop()
 
         internal_df['Account Number'] = (
             internal_df['Account Number']
             .astype(str)
             .str.strip()
-            .str.replace(r"\.0$", "", regex=True)
-            )
-        account_sample = internal_df['Account Number'].dropna().astype(str).str.strip().tolist()
+            .str.replace(r"\\.0$", "", regex=True)
+        )
+
+        account_sample = internal_df['Account Number'].dropna().tolist()
         st.write("🔍 First 10 Account Numbers:", account_sample[:10])
+
         region = None
         for acct in account_sample:
             region = detect_region(acct)
@@ -192,6 +194,81 @@ if uploaded_file and sheet_url and date_range and run_button:
         client_df = load_gsheet(sheet_url, region)
         st.success(f"✅ Loaded PSUReport for {region}")
         st.write(client_df.head())
+
+        # --- Resume Comparison Pipeline Here ---
+
+        # Filter internal by date range
+        if 'Date of Sale' not in internal_df.columns:
+            st.error("❌ Internal file must contain a 'Date of Sale' column.")
+            st.stop()
+
+        internal_df['Date of Sale'] = pd.to_datetime(internal_df['Date of Sale'], errors='coerce')
+        internal_df = internal_df[internal_df['Date of Sale'].between(pd.to_datetime(date_range[0]), pd.to_datetime(date_range[1]))]
+
+        # Extract product indicators
+        INTERNET_KEYWORDS = ["1 Gig", "500 Mbps", "200 Mbps", "100 Mbps", "UltraFibre 60 - Unlimited", "UltraFibre 90 - Unlimited", "UltraFibre 120 - Unlimited", "UltraFibre 180 - Unlimited", "UltraFibre 360 - Unlimited", "UltraFibre 1Gig - Unlimited", "UltraFibre 2Gig - Unlimited"]
+        TV_KEYWORDS = ["Stream Box", "Family +", "Variety +", "Entertainment +", "Locals +", "Supreme package", "epico x-stream", "epico plus", "epico intro", "epico basic"]
+        PHONE_KEYWORDS = ["Freedom", "Basic", "Landline Phone"]
+
+        def match_product(product, keywords):
+            return any(k == str(product) for k in keywords)
+
+        internal_df['Internet'] = internal_df['Product Name'].apply(lambda x: int(match_product(x, INTERNET_KEYWORDS)))
+        internal_df['TV'] = internal_df['Product Name'].apply(lambda x: int(match_product(x, TV_KEYWORDS)))
+        internal_df['Phone'] = internal_df['Product Name'].apply(lambda x: int(match_product(x, PHONE_KEYWORDS)))
+
+        summarized_internal = internal_df.groupby('Account Number')[['Internet', 'TV', 'Phone']].max().reset_index()
+
+        # Normalize client data
+        for col in ['Internet', 'TV', 'Phone']:
+            client_df[col] = client_df[col].apply(lambda x: 1 if str(x).strip() else 0)
+
+        # Aggregate client data by Account Number + SO Status
+        client_df['SO Status'] = client_df['SO Status'].fillna('')
+        grouped_client = client_df.groupby(['Account Number', 'SO Status'])[['Internet', 'TV', 'Phone']].max().reset_index()
+        latest_status_map = client_df.dropna(subset=['Date']).sort_values('Date').drop_duplicates('Account Number', keep='last').set_index('Account Number')['SO Status'].to_dict()
+
+        def get_best_match(account):
+            status = latest_status_map.get(account, '')
+            subset = grouped_client[(grouped_client['Account Number'] == account) & (grouped_client['SO Status'] == status)]
+            if not subset.empty:
+                return subset.iloc[0][['Internet', 'TV', 'Phone']].tolist()
+            return [None, None, None]
+
+        comparison = summarized_internal.copy()
+        comparison[['Internet_Client', 'TV_Client', 'Phone_Client']] = comparison['Account Number'].apply(lambda acct: pd.Series(get_best_match(acct)))
+
+        def determine_reason(row):
+            acct = row['Account Number']
+            client_rows = client_df[client_df['Account Number'] == acct]
+            if client_rows.empty or (client_rows[['Internet', 'TV', 'Phone']].sum(axis=1) == 0).all():
+                return "Missing from report"
+            if pd.isnull(row['Internet_Client']) and pd.isnull(row['TV_Client']) and pd.isnull(row['Phone_Client']):
+                return "Missing from report"
+            if (row['Internet_YESA'], row['TV_YESA'], row['Phone_YESA']) != (row['Internet_Client'], row['TV_Client'], row['Phone_Client']):
+                return "PSU - no match"
+            client_dates = client_rows['Date'].dropna()
+            if not client_dates.empty:
+                in_range = client_dates.between(pd.to_datetime(date_range[0]), pd.to_datetime(date_range[1])).any()
+                if not in_range:
+                    return "Missing from report - wrong date"
+            return None
+
+        comparison = comparison.rename(columns={"Internet": "Internet_YESA", "TV": "TV_YESA", "Phone": "Phone_YESA"})
+        comparison['Reason'] = comparison.apply(determine_reason, axis=1)
+
+        duplicate_counts = comparison['Account Number'].value_counts()
+        comparison['Reason'] = comparison.apply(lambda row: f"{row['Reason']} (addon)" if duplicate_counts[row['Account Number']] > 1 and pd.notnull(row['Reason']) else row['Reason'], axis=1)
+
+        mismatches = comparison[comparison['Reason'].notnull()]
+
+        st.subheader("📋 Mismatched Accounts")
+        if mismatches.empty:
+            st.success("🎉 All records matched correctly for the selected date range!")
+        else:
+            display_cols = ['Reason', 'Account Number', 'Internet_YESA', 'TV_YESA', 'Phone_YESA', 'Internet_Client', 'TV_Client', 'Phone_Client']
+            st.dataframe(mismatches[display_cols], use_container_width=True)
+            st.download_button("⬇️ Download Mismatches", mismatches[display_cols].to_csv(index=False), "mismatches.csv")
 
     except Exception as e:
         st.error(f"Error: {e}")
