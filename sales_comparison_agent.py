@@ -154,27 +154,21 @@ if uploaded_file and sheet_url and run_button:
                     (psu_rows['Date of Sale'].dt.date <= end_date)
                 ]
                 
-                # Default to no match
-                match_found = False
                 reason = None
+                psu = None
                 
-                for _, psu in psu_rows_in_range.iterrows():
-                    if (
-                        psu['Internet'] == row['Internet'] and
-                        psu['TV'] == row['TV'] and
-                        psu['Phone'] == row['Phone']
+                if not psu_rows_in_range.empty:
+                    combined = psu_rows_in_range[['Internet', 'TV', 'Phone']].max()
+                    if not (
+                        combined['Internet'] == row['Internet'] and
+                        combined['TV'] == row['TV'] and
+                        combined['Phone'] == row['Phone']
                     ):
-                        match_found = True
-                        break
-                
-                if not match_found:
-                    if not psu_rows_in_range.empty:
                         reason = "PSU - no match"
                         psu = psu_rows_in_range.iloc[0]
-                    else:
-                        reason = "Wrong date"
-                        # fallback to any row to show client-side values
-                        psu = psu_rows.iloc[0] if not psu_rows.empty else None
+                else:
+                    reason = "Wrong date"
+                    psu = psu_rows.iloc[0] if not psu_rows.empty else None
 
                 if reason and psu is not None:
                     mismatches.append({
