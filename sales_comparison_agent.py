@@ -157,6 +157,14 @@ def load_all_regions(sheet_url):
 
         df['Date'] = pd.to_datetime(df['Date'], errors='coerce')
         df['Region'] = region
+
+        # Standardize column order before merging
+        expected_cols = ['Account Number', 'Internet', 'TV', 'Phone', 'Date', 'SO Status', 'Region']
+        for col in expected_cols:
+            if col not in df.columns:
+                df[col] = None
+        df = df[expected_cols]
+
         all_data.append(df)
 
     full_df = pd.concat(all_data, ignore_index=True)
