@@ -178,7 +178,7 @@ if uploaded_file and sheet_url and date_range and run_button:
             .str.replace(r"\\.0$", "", regex=True)
         )
 
-                internal_df['Account Number'] = (
+        internal_df['Account Number'] = (
             internal_df['Account Number']
             .astype(str)
             .str.strip()
