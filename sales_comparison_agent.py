@@ -135,7 +135,20 @@ if uploaded_file and sheet_url and run_button:
             for col in ['Internet', 'TV', 'Phone']:
                 psu_df[col] = psu_df[col].apply(lambda x: 1 if str(x).strip() else 0)
             
-            psu_df = psu_df.set_index('Account Number')
+            if debug_mode:
+                st.write("🔍 Final PSU columns before set_index:", list(psu_df.columns))
+
+            # Try to find column name that matches 'Account Number' ignoring case/space
+            found_col = next((col for col in psu_df.columns if col.strip().lower() == 'account number'), None)
+            
+            if not found_col:
+                st.error("❌ Could not find a column matching 'Account Number'")
+                if debug_mode:
+                    st.write("🧩 PSU columns are:", list(psu_df.columns))
+                st.stop()
+            
+            psu_df[found_col] = psu_df[found_col].astype(str).str.strip()
+            psu_df = psu_df.set_index(found_col)
 
             for col in ['Internet', 'TV', 'Phone']:
                 psu_df[col] = psu_df[col].apply(lambda x: 1 if str(x).strip() else 0)
