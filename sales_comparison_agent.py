@@ -178,7 +178,7 @@ if uploaded_file and sheet_url and date_range and run_button:
             .str.replace(r"\\.0$", "", regex=True)
         )
 
-        internal_df['Account Number'] = (
+                internal_df['Account Number'] = (
             internal_df['Account Number']
             .astype(str)
             .str.strip()
@@ -206,8 +206,7 @@ if uploaded_file and sheet_url and date_range and run_button:
         # Filter internal by date range
         
 
-        internal_df['Date of Sale'] = pd.to_datetime(internal_df['Date of Sale'], errors='coerce')
-        internal_df = internal_df[internal_df['Date of Sale'].between(pd.to_datetime(date_range[0]), pd.to_datetime(date_range[1]))]
+        
 
         # Extract product indicators
         INTERNET_KEYWORDS = ["1 Gig", "500 Mbps", "200 Mbps", "100 Mbps", "UltraFibre 60 - Unlimited", "UltraFibre 90 - Unlimited", "UltraFibre 120 - Unlimited", "UltraFibre 180 - Unlimited", "UltraFibre 360 - Unlimited", "UltraFibre 1Gig - Unlimited", "UltraFibre 2Gig - Unlimited"]
