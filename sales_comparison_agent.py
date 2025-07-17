@@ -178,7 +178,7 @@ if uploaded_file and sheet_url and date_range and run_button:
             region = detect_region(acct)
             if region:
                 break
-        region = detect_region(account_sample)
+        #region = detect_region(account_sample)
 
         if not region:
             st.error("❌ Could not detect region from account number format.")
