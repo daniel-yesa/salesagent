@@ -117,9 +117,25 @@ if uploaded_file and sheet_url and run_button:
             
             for col in ['Internet', 'TV', 'Phone']:
                 psu_df[col] = psu_df[col].apply(lambda x: 1 if str(x).strip() else 0)
+            psu_df = pd.DataFrame(rows[1:], columns=headers)
+            psu_df.columns = psu_df.columns.str.strip()  # ✅ Clean column names
+            
+            # 🔎 Debug: see all columns if needed
+            if debug_mode:
+                st.write("🔍 Columns in PSU sheet:", list(psu_df.columns))
+            
+            # ✅ Validate required columns
+            required_cols = ["Account Number", "Date of Sale", "Internet", "TV", "Phone"]
+            missing = [col for col in required_cols if col not in psu_df.columns]
+            if missing:
+                st.error(f"❌ Merged PSUReport is missing required column(s): {missing}")
+                st.stop()
+            psu_df['Account Number'] = psu_df['Account Number'].astype(str).str.strip()
+            psu_df['Date of Sale'] = pd.to_datetime(psu_df['Date of Sale'], errors='coerce')
+            for col in ['Internet', 'TV', 'Phone']:
+                psu_df[col] = psu_df[col].apply(lambda x: 1 if str(x).strip() else 0)
             
             psu_df = psu_df.set_index('Account Number')
-
 
             for col in ['Internet', 'TV', 'Phone']:
                 psu_df[col] = psu_df[col].apply(lambda x: 1 if str(x).strip() else 0)
