@@ -172,7 +172,12 @@ if uploaded_file and sheet_url and date_range and run_button:
                 st.stop()
 
         internal_df['Account Number'] = internal_df['Account Number'].astype(str).str.strip()
-        account_sample = internal_df['Account Number'].dropna().astype(str).str.strip().values[0] if not internal_df['Account Number'].dropna().empty else ''
+        account_sample = internal_df['Account Number'].dropna().astype(str).str.strip().tolist()
+        region = None
+        for acct in account_sample:
+            region = detect_region(acct)
+            if region:
+                break
         region = detect_region(account_sample)
 
         if not region:
