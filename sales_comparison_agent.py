@@ -145,7 +145,7 @@ if uploaded_file and sheet_url and run_button:
             for idx, row in summarized.iterrows():
                 acct = row['Account Number']
                 if acct.startswith("833"):
-                continue  # ⛔️ Skip US accounts
+                    continue  # ⛔️ Skip US accounts
                 acct = row['Account Number']
                 total_checked += 1
                 progress.progress(min(total_checked / len(summarized), 1.0))
