@@ -217,13 +217,13 @@ if uploaded_file and sheet_url and date_range and run_button:
         internal_df['TV'] = internal_df['Product Name'].apply(lambda x: int(match_product(x, TV_KEYWORDS)))
         internal_df['Phone'] = internal_df['Product Name'].apply(lambda x: int(match_product(x, PHONE_KEYWORDS)))
 
-        internal_df['Account Number'] = (
-    internal_df['Account Number']
-    .astype(str)
-    .str.strip()
-    .str.replace(r"\.0$", "", regex=True)
-)
-summarized_internal = internal_df.groupby('Account Number')[['Internet', 'TV', 'Phone']].max().reset_index()
+                internal_df['Account Number'] = (
+            internal_df['Account Number']
+            .astype(str)
+            .str.strip()
+            .str.replace(r"\.0$", "", regex=True)
+        )
+        summarized_internal = internal_df.groupby('Account Number')[['Internet', 'TV', 'Phone']].max().reset_index()
 
         # Normalize client data
         for col in ['Internet', 'TV', 'Phone']:
