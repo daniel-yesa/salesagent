@@ -144,25 +144,46 @@ if uploaded_file and sheet_url and run_button:
                     mismatches.append({'Account Number': acct, 'Reason': 'Missing from report'})
                     continue
 
-                psu_row = psu_df.loc[acct]
-                if isinstance(psu_row, pd.DataFrame):
-                    psu = psu_row.iloc[0]
-                else:
-                    psu = psu_row
-
+                # Get all PSU rows for the account
+                psu_rows = psu_df.loc[[acct]] if acct in psu_df.index else pd.DataFrame()
+                
+                # Filter PSU rows within the selected date range
+                psu_rows_in_range = psu_rows[
+                    psu_rows['Date of Sale'].notna() &
+                    (psu_rows['Date of Sale'].dt.date >= start_date) &
+                    (psu_rows['Date of Sale'].dt.date <= end_date)
+                ]
+                
+                # Default to no match
+                match_found = False
                 reason = None
-                if not (psu['Internet'] == row['Internet'] and psu['TV'] == row['TV'] and psu['Phone'] == row['Phone']):
-                    reason = "PSU - no match"
-                elif pd.notna(psu['Date of Sale']) and not (start_date <= psu['Date of Sale'].date() <= end_date):
-                    reason = "Wrong date"
+                
+                for _, psu in psu_rows_in_range.iterrows():
+                    if (
+                        psu['Internet'] == row['Internet'] and
+                        psu['TV'] == row['TV'] and
+                        psu['Phone'] == row['Phone']
+                    ):
+                        match_found = True
+                        break
+                
+                if not match_found:
+                    if not psu_rows_in_range.empty:
+                        reason = "PSU - no match"
+                        psu = psu_rows_in_range.iloc[0]
+                    else:
+                        reason = "Wrong date"
+                        # fallback to any row to show client-side values
+                        psu = psu_rows.iloc[0] if not psu_rows.empty else None
 
-                if reason:
+                if reason and psu is not None:
                     mismatches.append({
                         'Account Number': acct,
                         'Reason': reason,
                         'Internet_YESA': row['Internet'],
                         'TV_YESA': row['TV'],
                         'Phone_YESA': row['Phone'],
+                        'Client Account': acct,
                         'Internet_Client': psu['Internet'],
                         'TV_Client': psu['TV'],
                         'Phone_Client': psu['Phone'],
