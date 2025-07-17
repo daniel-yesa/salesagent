@@ -8,8 +8,8 @@ import json
 import traceback
 
 # --- Streamlit UI ---
-st.set_page_config(page_title="MatchMate | Merged PSU", layout="wide")
-st.title("✨ MatchMate - Merged PSUReport Comparison")
+st.set_page_config(page_title="MatchMate | YESA", layout="wide")
+st.title("✨ MatchMate - Accounts Missing Finder")
 debug_mode = st.checkbox("🔍 Enable Debug Mode")
 
 # --- Keywords ---
@@ -32,10 +32,10 @@ def match_product(name, keywords):
     return any(k == str(name).strip() for k in keywords)
 
 # --- Inputs ---
-uploaded_file = st.file_uploader("📄 Upload Internal Sales CSV", type=["csv"])
+uploaded_file = st.file_uploader("📄 Upload Booked Sales CSV", type=["csv"])
 sheet_url = st.text_input("🔗 Paste Google Sheet URL (Merged PSUReport)")
 start_date, end_date = st.date_input("🗓 Select Date Range", [datetime.today(), datetime.today()])
-run_button = st.button("🚀 Run Comparison")
+run_button = st.button("🚀 Run Missing Report")
 
 # --- Main ---
 if uploaded_file and sheet_url and run_button:
@@ -68,9 +68,27 @@ if uploaded_file and sheet_url and run_button:
             rows = worksheet.get_all_values()
             headers = rows[0]
             psu_df = pd.DataFrame(rows[1:], columns=headers)
-
+            psu_df.columns = psu_df.columns.str.strip()  # ✅ Clean column names
+            
+            # ✅ Required column list
+            required_cols = ["Account Number", "Date of Sale", "Internet", "TV", "Phone"]
+            missing_cols = [col for col in required_cols if col not in psu_df.columns]
+            
+            if missing_cols:
+                st.error(f"❌ Merged PSUReport is missing required column(s): {missing_cols}")
+                if debug_mode:
+                    st.write("📋 Found columns in sheet:", list(psu_df.columns))
+                st.stop()
+            
+            # ✅ Safe conversions
             psu_df['Account Number'] = psu_df['Account Number'].astype(str).str.strip()
             psu_df['Date of Sale'] = pd.to_datetime(psu_df['Date of Sale'], errors='coerce')
+            
+            for col in ['Internet', 'TV', 'Phone']:
+                psu_df[col] = psu_df[col].apply(lambda x: 1 if str(x).strip() else 0)
+            
+            psu_df = psu_df.set_index('Account Number')
+
 
             for col in ['Internet', 'TV', 'Phone']:
                 psu_df[col] = psu_df[col].apply(lambda x: 1 if str(x).strip() else 0)
