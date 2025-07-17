@@ -162,6 +162,15 @@ if uploaded_file and sheet_url and date_range and run_button:
         content = uploaded_file.read().decode("utf-8") if uploaded_file.name.endswith(".csv") else uploaded_file
         internal_df = pd.read_csv(io.StringIO(content)) if uploaded_file.name.endswith(".csv") else pd.read_excel(uploaded_file)
 
+        if "Account Number" not in internal_df.columns:
+            if "Billing Account Number" in internal_df.columns:
+                internal_df.rename(columns={"Billing Account Number": "Account Number"}, inplace=True)
+            elif "Account No" in internal_df.columns:
+                internal_df.rename(columns={"Account No": "Account Number"}, inplace=True)
+            else:
+                st.error("❌ Internal file is missing 'Account Number', 'Billing Account Number', or 'Account No' column.")
+                st.stop()
+
         internal_df['Account Number'] = internal_df['Account Number'].astype(str).str.strip()
         account_sample = internal_df['Account Number'].dropna().iloc[0]
         region = detect_region(account_sample)
