@@ -93,26 +93,18 @@ def detect_region(account_number):
         return 'US'
     return None
 
-# --- Load Correct Sheet Based on Region ---
-def load_gsheet(sheet_url, region):
+# --- Load and Combine All PSU Reports ---
+def load_all_regions(sheet_url):
     json_creds = json.loads(st.secrets["GOOGLE_SERVICE_ACCOUNT_JSON"])
     creds = Credentials.from_service_account_info(json_creds, scopes=scope)
     client = gspread.authorize(creds)
     sheet = client.open_by_url(sheet_url)
 
-    tab_map = {
+    region_tabs = {
         'ON': 'PSUReport ON',
         'QC': 'PSUReport QC',
         'US': 'PSUReport US'
     }
-    region_tab = tab_map.get(region)
-    if not region_tab:
-        raise ValueError(f"Unsupported region for sheet tab lookup: {region}")
-
-    worksheet = sheet.worksheet(region_tab)
-    rows = worksheet.get_all_values()
-    headers = rows[0]
-    df = pd.DataFrame(rows[1:], columns=headers)
 
     column_map = {
         'ON': {
@@ -141,143 +133,66 @@ def load_gsheet(sheet_url, region):
         }
     }
 
-    region_cols = column_map[region]
-    df = df.rename(columns={v: k for k, v in region_cols.items()})
-    for col in ['Internet', 'TV', 'Phone']:
-        if col not in df.columns:
-            df[col] = ""
-    df['Account Number'] = (
-    df['Account Number']
-    .astype(str)
-    .str.strip()
-    .str.replace(r"\.0$", "", regex=True)
-)
-    df['Date'] = pd.to_datetime(df['Date'], errors='coerce')
-    return df
+    all_data = []
 
-# --- Upload UI & Run ---
-with st.expander("📥 Upload Internal Sales File & Connect Sheet", expanded=True):
-    uploaded_file = st.file_uploader("Upload Internal Sales CSV or Excel", type=["csv", "xlsx"])
-    sheet_url = st.text_input("Paste Client Google Sheet URL")
-    date_range = st.date_input("Select Date Range for Comparison", [])
-    run_button = st.button("🚀 Run MatchMate")
+    for region, tab in region_tabs.items():
+        worksheet = sheet.worksheet(tab)
+        rows = worksheet.get_all_values()
+        headers = rows[0]
+        df = pd.DataFrame(rows[1:], columns=headers)
 
-if uploaded_file and sheet_url and date_range and run_button:
-    try:
-        content = uploaded_file.read().decode("utf-8") if uploaded_file.name.endswith(".csv") else uploaded_file
-        internal_df = pd.read_csv(io.StringIO(content)) if uploaded_file.name.endswith(".csv") else pd.read_excel(uploaded_file)
+        mapping = column_map[region]
+        df = df.rename(columns={v: k for k, v in mapping.items()})
 
-        if "Account Number" not in internal_df.columns:
-            if "Billing Account Number" in internal_df.columns:
-                internal_df.rename(columns={"Billing Account Number": "Account Number"}, inplace=True)
-            elif "Account No" in internal_df.columns:
-                internal_df.rename(columns={"Account No": "Account Number"}, inplace=True)
-            else:
-                st.error("❌ Internal file is missing 'Account Number', 'Billing Account Number', or 'Account No' column.")
-                st.stop()
+        for col in ['Internet', 'TV', 'Phone']:
+            if col not in df.columns:
+                df[col] = ""
 
-        internal_df['Account Number'] = (
-            internal_df['Account Number']
+        df['Account Number'] = (
+            df['Account Number']
             .astype(str)
             .str.strip()
             .str.replace(r"\\.0$", "", regex=True)
         )
 
-        internal_df['Account Number'] = (
-            internal_df['Account Number']
-            .astype(str)
-            .str.strip()
-            .str.replace(r"\.0$", "", regex=True)
-        )
-        account_sample = internal_df['Account Number'].dropna().tolist()
-        st.write("🔍 First 10 Account Numbers:", account_sample[:10])
+        df['Date'] = pd.to_datetime(df['Date'], errors='coerce')
+        df['Region'] = region
+        all_data.append(df)
 
-        region = None
-        for acct in account_sample:
-            region = detect_region(acct)
-            if region:
-                break
+    full_df = pd.concat(all_data, ignore_index=True)
+    return full_df
 
-        if not region:
-            st.error("❌ Could not detect region from account number format.")
-            st.stop()
+# --- App Input UI ---
+with st.expander("🔧 Configure and Run", expanded=True):
+    uploaded_file = st.file_uploader("📄 Upload Internal Sales CSV or Excel", type=["csv", "xlsx"])
+    sheet_url = st.text_input("🔗 Paste Client Google Sheet URL", value="")
+    date_range = st.date_input("📅 Choose Sale Date Range", value=(datetime.today(), datetime.today()))
+    run_button = st.button("🚀 Run Data Comparison")
 
-        client_df = load_gsheet(sheet_url, region)
-        st.success(f"✅ Loaded PSUReport for {region}")
-        st.write(client_df.head())
+# --- Validate and Compare ---
+if uploaded_file and sheet_url and run_button:
+    if isinstance(date_range, tuple):
+        start_date, end_date = date_range
+    else:
+        st.error("❌ Please select a date range.")
+        st.stop()
 
-        # --- Resume Comparison Pipeline Here ---
+    if uploaded_file.name.endswith(".csv"):
+        internal_raw = pd.read_csv(uploaded_file)
+    else:
+        internal_raw = pd.read_excel(uploaded_file)
 
-        # Filter internal by date range
-        
+    internal_raw['Account Number'] = (
+        internal_raw['Account Number']
+        .astype(str)
+        .str.strip()
+        .str.replace(r"\\.0$", "", regex=True)
+    )
 
-        
+    internal_raw = internal_raw[internal_raw['Account Number'].notna()]
 
-        # Extract product indicators
-        INTERNET_KEYWORDS = ["1 Gig", "500 Mbps", "200 Mbps", "100 Mbps", "UltraFibre 60 - Unlimited", "UltraFibre 90 - Unlimited", "UltraFibre 120 - Unlimited", "UltraFibre 180 - Unlimited", "UltraFibre 360 - Unlimited", "UltraFibre 1Gig - Unlimited", "UltraFibre 2Gig - Unlimited"]
-        TV_KEYWORDS = ["Stream Box", "Family +", "Variety +", "Entertainment +", "Locals +", "Supreme package", "epico x-stream", "epico plus", "epico intro", "epico basic"]
-        PHONE_KEYWORDS = ["Freedom", "Basic", "Landline Phone"]
+    with st.spinner("📥 Loading client Google Sheet data..."):
+        client_df = load_all_regions(sheet_url)
 
-        def match_product(product, keywords):
-            return any(k == str(product) for k in keywords)
-
-        internal_df['Internet'] = internal_df['Product Name'].apply(lambda x: int(match_product(x, INTERNET_KEYWORDS)))
-        internal_df['TV'] = internal_df['Product Name'].apply(lambda x: int(match_product(x, TV_KEYWORDS)))
-        internal_df['Phone'] = internal_df['Product Name'].apply(lambda x: int(match_product(x, PHONE_KEYWORDS)))
-
-        summarized_internal = internal_df.groupby('Account Number')[['Internet', 'TV', 'Phone']].max().reset_index()
-
-        # Normalize client data
-        for col in ['Internet', 'TV', 'Phone']:
-            client_df[col] = client_df[col].apply(lambda x: 1 if str(x).strip() else 0)
-
-        # Aggregate client data by Account Number + SO Status
-        client_df['SO Status'] = client_df['SO Status'].fillna('')
-        grouped_client = client_df.groupby(['Account Number', 'SO Status'])[['Internet', 'TV', 'Phone']].max().reset_index()
-        latest_status_map = client_df.dropna(subset=['Date']).sort_values('Date').drop_duplicates('Account Number', keep='last').set_index('Account Number')['SO Status'].to_dict()
-
-        def get_best_match(account):
-            status = latest_status_map.get(account, '')
-            subset = grouped_client[(grouped_client['Account Number'] == account) & (grouped_client['SO Status'] == status)]
-            if not subset.empty:
-                return subset.iloc[0][['Internet', 'TV', 'Phone']].tolist()
-            return [None, None, None]
-
-        comparison = summarized_internal.copy()
-        comparison[['Internet_Client', 'TV_Client', 'Phone_Client']] = comparison['Account Number'].apply(lambda acct: pd.Series(get_best_match(acct)))
-
-        def determine_reason(row):
-            acct = row['Account Number']
-            client_rows = client_df[client_df['Account Number'] == acct]
-            if client_rows.empty or (client_rows[['Internet', 'TV', 'Phone']].sum(axis=1) == 0).all():
-                return "Missing from report"
-            if pd.isnull(row['Internet_Client']) and pd.isnull(row['TV_Client']) and pd.isnull(row['Phone_Client']):
-                return "Missing from report"
-            if (row['Internet_YESA'], row['TV_YESA'], row['Phone_YESA']) != (row['Internet_Client'], row['TV_Client'], row['Phone_Client']):
-                return "PSU - no match"
-            client_dates = client_rows['Date'].dropna()
-            if not client_dates.empty:
-                in_range = client_dates.between(pd.to_datetime(date_range[0]), pd.to_datetime(date_range[1])).any()
-                if not in_range:
-                    return "Missing from report - wrong date"
-            return None
-
-        comparison = comparison.rename(columns={"Internet": "Internet_YESA", "TV": "TV_YESA", "Phone": "Phone_YESA"})
-        comparison['Reason'] = comparison.apply(determine_reason, axis=1)
-
-        duplicate_counts = comparison['Account Number'].value_counts()
-        comparison['Reason'] = comparison.apply(lambda row: f"{row['Reason']} (addon)" if duplicate_counts[row['Account Number']] > 1 and pd.notnull(row['Reason']) else row['Reason'], axis=1)
-
-        comparison['Client Account Number'] = comparison['Account Number']
-        mismatches = comparison[comparison['Reason'].notnull()]
-
-        st.subheader("📋 Mismatched Accounts")
-        if mismatches.empty:
-            st.success("🎉 All records matched correctly for the selected date range!")
-        else:
-            display_cols = ['Reason', 'Account Number', 'Internet_YESA', 'TV_YESA', 'Phone_YESA', 'Internet_Client', 'TV_Client', 'Phone_Client', 'Client Account Number']
-            st.dataframe(mismatches[display_cols], use_container_width=True)
-            st.download_button("⬇️ Download Mismatches", mismatches[display_cols].to_csv(index=False), "mismatches.csv")
-
-    except Exception as e:
-        st.error(f"Error: {e}")
+    st.success("✅ PSU Reports Loaded")
+    st.write(client_df.head())
