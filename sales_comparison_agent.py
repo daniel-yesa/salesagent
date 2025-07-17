@@ -171,15 +171,14 @@ if uploaded_file and sheet_url and date_range and run_button:
                 st.error("❌ Internal file is missing 'Account Number', 'Customer Account Number', 'Billing Account Number', or 'Account No' column.")
                 st.stop()
 
-        st.write("🔍 First 10 Account Numbers:", account_sample[:10])
         internal_df['Account Number'] = internal_df['Account Number'].astype(str).str.strip()
         account_sample = internal_df['Account Number'].dropna().astype(str).str.strip().tolist()
+        st.write("🔍 First 10 Account Numbers:", account_sample[:10])
         region = None
         for acct in account_sample:
             region = detect_region(acct)
             if region:
                 break
-        #region = detect_region(account_sample)
 
         if not region:
             st.error("❌ Could not detect region from account number format.")
