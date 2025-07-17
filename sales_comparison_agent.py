@@ -35,6 +35,37 @@ def match_product(name, keywords):
 uploaded_file = st.file_uploader("📄 Upload Booked Sales CSV", type=["csv"])
 sheet_url = st.text_input("🔗 Paste Google Sheet URL (Merged PSUReport)")
 start_date, end_date = st.date_input("🗓 Select Date Range", [datetime.today(), datetime.today()])
+if sheet_url:
+    try:
+        creds = Credentials.from_service_account_info(
+            json.loads(st.secrets["GOOGLE_SERVICE_ACCOUNT_JSON"]),
+            scopes=["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
+        )
+        sheet = gspread.authorize(creds).open_by_url(sheet_url)
+
+        try:
+            worksheet = sheet.worksheet("Merged PSUReport")
+        except gspread.exceptions.WorksheetNotFound:
+            st.error("❌ Could not find tab named 'Merged PSUReport'")
+            if debug_mode:
+                st.write("🗂 Tabs available:", [ws.title for ws in sheet.worksheets()])
+            st.stop()
+
+        rows = worksheet.get_all_values()
+        headers = rows[0]
+        psu_preview = pd.DataFrame(rows[1:], columns=headers)
+        psu_preview.columns = psu_preview.columns.str.strip()
+
+        st.markdown("### 📋 Preview: Merged PSUReport (First 10 Rows)")
+        st.dataframe(psu_preview.head(10), use_container_width=True)
+
+        if st.checkbox("🔎 Show full PSU sheet preview"):
+            st.dataframe(psu_preview, use_container_width=True)
+
+    except Exception as e:
+        st.error("❌ Failed to preview PSU sheet.")
+        if debug_mode:
+            st.exception(e)
 run_button = st.button("🚀 Run Missing Report")
 
 # --- Main ---
