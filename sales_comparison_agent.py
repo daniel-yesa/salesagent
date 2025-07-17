@@ -133,6 +133,7 @@ def load_all_regions(sheet_url):
         }
     }
 
+    expected_cols = ['Account Number', 'Internet', 'TV', 'Phone', 'Date', 'SO Status', 'Region']
     all_data = []
 
     for region, tab in region_tabs.items():
@@ -143,6 +144,7 @@ def load_all_regions(sheet_url):
 
         mapping = column_map[region]
         df = df.rename(columns={v: k for k, v in mapping.items()})
+        df = df[list(mapping.values())]  # keep only mapped columns
 
         for col in ['Internet', 'TV', 'Phone']:
             if col not in df.columns:
@@ -152,55 +154,126 @@ def load_all_regions(sheet_url):
             df['Account Number']
             .astype(str)
             .str.strip()
-            .str.replace(r"\\.0$", "", regex=True)
+            .str.replace(r"\.0$", "", regex=True)
         )
 
         df['Date'] = pd.to_datetime(df['Date'], errors='coerce')
         df['Region'] = region
 
-        # Standardize column order before merging
-        expected_cols = ['Account Number', 'Internet', 'TV', 'Phone', 'Date', 'SO Status', 'Region']
         for col in expected_cols:
             if col not in df.columns:
                 df[col] = None
-        df = df[expected_cols]
 
+        df = df[expected_cols]
         all_data.append(df)
 
     full_df = pd.concat(all_data, ignore_index=True)
     return full_df
 
-# --- App Input UI ---
-with st.expander("🔧 Configure and Run", expanded=True):
-    uploaded_file = st.file_uploader("📄 Upload Internal Sales CSV or Excel", type=["csv", "xlsx"])
-    sheet_url = st.text_input("🔗 Paste Client Google Sheet URL", value="")
-    date_range = st.date_input("📅 Choose Sale Date Range", value=(datetime.today(), datetime.today()))
-    run_button = st.button("🚀 Run Data Comparison")
+# === Internal sales processing, product matching, mismatch logic, UI, and results display ===
 
-# --- Validate and Compare ---
-if uploaded_file and sheet_url and run_button:
-    if isinstance(date_range, tuple):
-        start_date, end_date = date_range
-    else:
-        st.error("❌ Please select a date range.")
-        st.stop()
+INTERNET_KEYWORDS = [
+    "1 Gig", "500 Mbps", "200 Mbps", "100 Mbps",
+    "UltraFibre 60 - Unlimited", "UltraFibre 90 - Unlimited",
+    "UltraFibre 120 - Unlimited", "UltraFibre 180 - Unlimited",
+    "UltraFibre 360 - Unlimited", "UltraFibre 1Gig - Unlimited",
+    "UltraFibre 2Gig - Unlimited"
+]
 
-    if uploaded_file.name.endswith(".csv"):
-        internal_raw = pd.read_csv(uploaded_file)
-    else:
-        internal_raw = pd.read_excel(uploaded_file)
+TV_KEYWORDS = [
+    "Stream Box", "Family +", "Variety +", "Entertainment +", "Locals +",
+    "Supreme package", "epico x-stream", "epico plus", "epico intro", "epico basic"
+]
 
-    internal_raw['Account Number'] = (
-        internal_raw['Account Number']
+PHONE_KEYWORDS = ["Freedom", "Basic", "Landline Phone"]
+
+def match_product(product, keywords):
+    return any(k == str(product) for k in keywords)
+
+def summarize_internal_data(df):
+    df['Account Number'] = (
+        df['Account Number']
         .astype(str)
         .str.strip()
-        .str.replace(r"\\.0$", "", regex=True)
+        .str.replace(r"\.0$", "", regex=True)
     )
 
-    internal_raw = internal_raw[internal_raw['Account Number'].notna()]
+    df['Internet'] = df['Product Name'].apply(lambda x: int(match_product(x, INTERNET_KEYWORDS)))
+    df['TV'] = df['Product Name'].apply(lambda x: int(match_product(x, TV_KEYWORDS)))
+    df['Phone'] = df['Product Name'].apply(lambda x: int(match_product(x, PHONE_KEYWORDS)))
 
-    with st.spinner("📥 Loading client Google Sheet data..."):
+    summarized = df.groupby('Account Number')[['Internet', 'TV', 'Phone']].max().reset_index()
+    return summarized
+
+def compare_sales(internal_df, client_df, start_date, end_date):
+    internal_df['Account Number'] = internal_df['Account Number'].astype(str)
+    client_df['Account Number'] = client_df['Account Number'].astype(str)
+
+    merged = pd.merge(internal_df, client_df, on='Account Number', how='left', suffixes=('_YESA', '_Client'))
+
+    reasons = []
+    for _, row in merged.iterrows():
+        acct = row['Account Number']
+        if pd.isna(row['Internet_Client']) and pd.isna(row['TV_Client']) and pd.isna(row['Phone_Client']):
+            reasons.append("Missing from report")
+        elif not (row['Internet_YESA'] == row['Internet_Client'] and row['TV_YESA'] == row['TV_Client'] and row['Phone_YESA'] == row['Phone_Client']):
+            reasons.append("PSU - no match")
+        elif not pd.isnull(row['Date']):
+            if not (start_date <= row['Date'].date() <= end_date):
+                reasons.append("Missing from report - Wrong date")
+            else:
+                reasons.append(None)
+        else:
+            reasons.append(None)
+
+    merged['Reason'] = reasons
+    mismatches = merged[merged['Reason'].notnull()]
+
+    duplicates = mismatches['Account Number'].value_counts()
+    mismatches['Reason'] = mismatches.apply(
+        lambda row: row['Reason'] + " (addon)" if duplicates[row['Account Number']] > 1 else row['Reason'], axis=1
+    )
+
+    return mismatches
+
+# === Streamlit UI ===
+st.markdown("## 📊 Upload Internal Sales Data")
+col1, col2 = st.columns(2)
+with col1:
+    uploaded_file = st.file_uploader("📄 Upload Internal Sales CSV", type=["csv"])
+with col2:
+    sheet_url = st.text_input("🔗 Paste Client Google Sheet URL")
+
+start_date, end_date = st.date_input("🗓 Select Date Range", [datetime.today(), datetime.today()])
+run_button = st.button("🚀 Run Comparison")
+
+if uploaded_file and sheet_url and run_button:
+    try:
+        internal_raw = pd.read_csv(uploaded_file)
+
+        if 'Account Number' not in internal_raw.columns or 'Product Name' not in internal_raw.columns:
+            st.error("❌ Required columns missing in internal file.")
+            st.stop()
+
+        summarized_internal = summarize_internal_data(internal_raw)
+        st.success("✅ Internal data summarized.")
+
         client_df = load_all_regions(sheet_url)
+        for col in ['Internet', 'TV', 'Phone']:
+            client_df[col] = client_df[col].apply(lambda x: 1 if str(x).strip() else 0)
 
-    st.success("✅ PSU Reports Loaded")
-    st.write(client_df.head())
+        mismatches = compare_sales(summarized_internal, client_df, start_date, end_date)
+
+        st.subheader("📋 Mismatched Accounts")
+        if mismatches.empty:
+            st.success("🎉 All records matched!")
+        else:
+            show_cols = [
+                "Reason", "Account Number", "Internet_YESA", "TV_YESA", "Phone_YESA",
+                "Internet_Client", "TV_Client", "Phone_Client", "Date", "Region"
+            ]
+            st.dataframe(mismatches[show_cols], use_container_width=True)
+            st.download_button("⬇️ Download Mismatches", mismatches[show_cols].to_csv(index=False), "mismatches.csv")
+
+    except Exception as e:
+        st.error(f"❌ Error occurred: {e}")
