@@ -204,9 +204,7 @@ if uploaded_file and sheet_url and date_range and run_button:
         # --- Resume Comparison Pipeline Here ---
 
         # Filter internal by date range
-        if 'Date of Sale' not in internal_df.columns:
-            st.error("❌ Internal file must contain a 'Date of Sale' column.")
-            st.stop()
+        
 
         internal_df['Date of Sale'] = pd.to_datetime(internal_df['Date of Sale'], errors='coerce')
         internal_df = internal_df[internal_df['Date of Sale'].between(pd.to_datetime(date_range[0]), pd.to_datetime(date_range[1]))]
