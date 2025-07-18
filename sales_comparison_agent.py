@@ -212,5 +212,5 @@ if uploaded_file and sheet_url and run_button:
                     if debug_mode:
                         st.exception(e)
 
-    except Exception as e:
-            st.error("❌ Error occurred during processing.")
+        except Exception as e:
+                st.error("❌ Error occurred during processing.")
