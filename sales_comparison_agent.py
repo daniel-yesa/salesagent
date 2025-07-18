@@ -49,15 +49,14 @@ default_url = "https://docs.google.com/spreadsheets/d/1tamMxhdJ-_wuyCrmu9mK6RiVj
 sheet_url = st.text_input("\U0001F517 Paste Google Sheet URL (Merged PSUReport)", value=default_url)
 st.markdown("#### 📅 Booked Date Range")
 date_range = st.date_input(
-    label="",
-    value=(None, None),
-    help="Select booked date range",
+    label="Select booked date range",
+    value=(date.today(), date.today()),
     key="booked_date_range"
 )
 
-# Validate range selected
-if not date_range or len(date_range) != 2 or any(d is None for d in date_range):
-    st.warning("⚠️ Please select a start and end date to continue.")
+# Validate that the user has selected a valid range
+if not isinstance(date_range, tuple) or len(date_range) != 2:
+    st.warning("⚠️ Please select a valid start and end date.")
     st.stop()
 
 start_date, end_date = date_range
