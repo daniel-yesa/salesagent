@@ -174,7 +174,7 @@ if uploaded_file and sheet_url and run_button:
                             return "PSUs don't match report"
                         return ""
     
-                    merged_df["Date of Sale_x"] = pd.to_datetime(merged_df["Date of Sale_x"], errors="coerce")
+                    merged_df["Date of Sale"] = pd.to_datetime(merged_df["Date of Sale"], errors="coerce")
                     merged_df["Scheduled Install Date"] = pd.to_datetime(merged_df["Scheduled Install Date"], errors="coerce")
                     today_mmddyyyy = datetime.today().strftime("%m/%d/%Y")
     
@@ -185,7 +185,7 @@ if uploaded_file and sheet_url and run_button:
                         "Account number": merged_df["Account Number"],
                         "Customer Address": merged_df.apply(format_address, axis=1),
                         "City": merged_df["City"],
-                        "Date Of Sale": merged_df["Date of Sale_x"].dt.strftime("%m/%d/%Y"),
+                        "Date Of Sale": merged_df["Date of Sale"].dt.strftime("%m/%d/%Y"),
                         "Sales Rep": merged_df["Sale Rep"],
                         "Rep ID": merged_df["Rep Id"],
                         "Install Type": merged_df["Self Install"].apply(install_type),
