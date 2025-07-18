@@ -257,7 +257,7 @@ if uploaded_file and sheet_url and run_button:
                                 }});
                             }};
                         </script>
-                    "", height=100)
+                    """, height=100)
                         
                     st.download_button(
                         label="⬇️ Download Appeals CSV",
