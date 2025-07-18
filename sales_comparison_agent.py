@@ -148,66 +148,66 @@ if uploaded_file and sheet_url and run_button:
             st.metric("Total Checked", total_checked)
             st.metric("Mismatches Found", len(result_df))
 
-            if result_df.empty:
-                st.success("\U0001F389 All records matched!")
-            else:
-                st.dataframe(result_df, use_container_width=True)
-                today_str = datetime.today().strftime("%B %d %Y")
-                st.download_button("⬇️ Download CSV", result_df.to_csv(index=False), file_name=f"Mismatched {today_str}.csv")
+        if result_df.empty:
+            st.success("\U0001F389 All records matched!")
+        else:
+            st.dataframe(result_df, use_container_width=True)
+            today_str = datetime.today().strftime("%B %d %Y")
+            st.download_button("⬇️ Download CSV", result_df.to_csv(index=False), file_name=f"Mismatched {today_str}.csv")
 
-                # --- ⬇️ Generate Open Appeals table directly ---
-                try:
-                    merged_df = pd.merge(result_df, internal_df, on="Account Number", how="left")
+            # --- ⬇️ Generate Open Appeals table directly ---
+            try:
+                merged_df = pd.merge(result_df, internal_df, on="Account Number", how="left")
 
-                    def format_address(row):
-                        addr = row.get("Customer Address", "")
-                        addr2 = row.get("Customer Address Line 2", "")
-                        return f"{addr}, {addr2}" if pd.notna(addr2) and addr2.strip() else addr
+                def format_address(row):
+                    addr = row.get("Customer Address", "")
+                    addr2 = row.get("Customer Address Line 2", "")
+                    return f"{addr}, {addr2}" if pd.notna(addr2) and addr2.strip() else addr
 
-                    def install_type(val):
-                        return "Self Install" if str(val).strip().lower() == "yes" else "Tech Visit"
+                def install_type(val):
+                    return "Self Install" if str(val).strip().lower() == "yes" else "Tech Visit"
 
-                    def map_reason(reason):
-                        if reason == "Missing from report":
-                            return "Account missing from report"
-                        if reason == "PSU - no match":
-                            return "PSUs don't match report"
-                        return ""
+                def map_reason(reason):
+                    if reason == "Missing from report":
+                        return "Account missing from report"
+                    if reason == "PSU - no match":
+                        return "PSUs don't match report"
+                    return ""
 
-                    merged_df["Date of Sale_x"] = pd.to_datetime(merged_df["Date of Sale_x"], errors="coerce")
-                    merged_df["Scheduled Install Date"] = pd.to_datetime(merged_df["Scheduled Install Date"], errors="coerce")
-                    today_mmddyyyy = datetime.today().strftime("%m/%d/%Y")
+                merged_df["Date of Sale_x"] = pd.to_datetime(merged_df["Date of Sale_x"], errors="coerce")
+                merged_df["Scheduled Install Date"] = pd.to_datetime(merged_df["Scheduled Install Date"], errors="coerce")
+                today_mmddyyyy = datetime.today().strftime("%m/%d/%Y")
 
-                    appeals_df = pd.DataFrame({
-                        "Type of Appeal": ["Open"] * len(merged_df),
-                        "Name of Appealer": [appealer_name] * len(merged_df),
-                        "Date of Appeal": [today_mmddyyyy] * len(merged_df),
-                        "Account number": merged_df["Account Number"],
-                        "Customer Address": merged_df.apply(format_address, axis=1),
-                        "City": merged_df["City"],
-                        "Date Of Sale": merged_df["Date of Sale_x"].dt.strftime("%m/%d/%Y"),
-                        "Sales Rep": merged_df["Sale Rep"],
-                        "Rep ID": merged_df["Rep Id"],
-                        "Install Type": merged_df["Self Install"].apply(install_type),
-                        "Installation Date": merged_df["Scheduled Install Date"].dt.strftime("%m/%d/%Y"),
-                        "Internet": merged_df["Internet_YESA"].apply(lambda x: 1 if x == 1 else ""),
-                        "TV": merged_df["TV_YESA"].apply(lambda x: 1 if x == 1 else ""),
-                        "Phone": merged_df["Phone_YESA"].apply(lambda x: 1 if x == 1 else ""),
-                        "Reason for Appeal": merged_df["Reason"].apply(map_reason),
-                    })
+                appeals_df = pd.DataFrame({
+                    "Type of Appeal": ["Open"] * len(merged_df),
+                    "Name of Appealer": [appealer_name] * len(merged_df),
+                    "Date of Appeal": [today_mmddyyyy] * len(merged_df),
+                    "Account number": merged_df["Account Number"],
+                    "Customer Address": merged_df.apply(format_address, axis=1),
+                    "City": merged_df["City"],
+                    "Date Of Sale": merged_df["Date of Sale_x"].dt.strftime("%m/%d/%Y"),
+                    "Sales Rep": merged_df["Sale Rep"],
+                    "Rep ID": merged_df["Rep Id"],
+                    "Install Type": merged_df["Self Install"].apply(install_type),
+                    "Installation Date": merged_df["Scheduled Install Date"].dt.strftime("%m/%d/%Y"),
+                    "Internet": merged_df["Internet_YESA"].apply(lambda x: 1 if x == 1 else ""),
+                    "TV": merged_df["TV_YESA"].apply(lambda x: 1 if x == 1 else ""),
+                    "Phone": merged_df["Phone_YESA"].apply(lambda x: 1 if x == 1 else ""),
+                    "Reason for Appeal": merged_df["Reason"].apply(map_reason),
+                })
 
-                    appeals_df = appeals_df.drop_duplicates(subset=["Account number"])
+                appeals_df = appeals_df.drop_duplicates(subset=["Account number"])
 
-                    st.subheader("📄 Open Appeals Table")
-                    st.dataframe(appeals_df, use_container_width=True)
+                st.subheader("📄 Open Appeals Table")
+                st.dataframe(appeals_df, use_container_width=True)
 
-                    st.download_button(
-                        label="⬇️ Download Appeals CSV",
-                        data=appeals_df.to_csv(index=False),
-                        file_name=f"Open_Appeals {today_str}.csv"
-                    )
+                st.download_button(
+                    label="⬇️ Download Appeals CSV",
+                    data=appeals_df.to_csv(index=False),
+                    file_name=f"Open_Appeals {today_str}.csv"
+                )
 
-                except Exception as e:
-                    st.error("❌ Failed to generate Open Appeals table.")
-                    if debug_mode:
-                        st.exception(e)
+            except Exception as e:
+                st.error("❌ Failed to generate Open Appeals table.")
+                if debug_mode:
+                    st.exception(e)
