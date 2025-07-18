@@ -49,8 +49,8 @@ default_url = "https://docs.google.com/spreadsheets/d/1tamMxhdJ-_wuyCrmu9mK6RiVj
 sheet_url = st.text_input("\U0001F517 Paste Google Sheet URL (Merged PSUReport)", value=default_url)
 st.markdown("#### 📅 Booked Date Range")
 date_range = st.date_input(
-    label="Select booked date range",
-    value=(date.today(), date.today()),
+    label="📅 Select booked date range",
+    value=None,
     key="booked_date_range"
 )
 
