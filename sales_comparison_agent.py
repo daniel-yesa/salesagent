@@ -211,7 +211,7 @@ if uploaded_file and sheet_url and run_button:
                         file_name=f"Open_Appeals {today_str}.csv"
                     )
                 
-                except Exception as e:
-                    st.error("❌ Failed to generate Open Appeals table.")
-                    if debug_mode:
-                        st.exception(e)
+            except Exception as e:
+                st.error("❌ Failed to generate Open Appeals table.")
+                if debug_mode:
+                    st.exception(e)
