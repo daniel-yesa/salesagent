@@ -214,117 +214,114 @@ if uploaded_file and sheet_url and run_button:
                     })
     
                     appeals_df = appeals_df.drop_duplicates(subset=["Account number"])
-                    # Split Ontario and Quebec
-                    ontario_df = appeals_df[appeals_df["Account number"].astype(str).str.startswith("500")]
-                    quebec_df = appeals_df[appeals_df["Account number"].astype(str).str.startswith("960")]
+                    # Split Ontario & Quebec
+                    ontario_df = appeals_df[appeals_df["Account number"].str.startswith("500")].copy()
+                    quebec_df = appeals_df[appeals_df["Account number"].str.startswith("960")].copy()
+                    today_str = datetime.today().strftime("%B %d %Y")
                     
+                    # Helper function
                     def render_appeals_section(region, df, filename):
                         if df.empty:
                             st.info(f"ℹ️ No {region} appeals found.")
                             return
                     
-                        st.subheader(f"📄 Open Appeals Table – {region}")
-                        st.dataframe(df, use_container_width=True)
+                        st.subheader(f"📄 {region} Appeals")
+                        col1, col2 = st.columns([1, 1])
                     
-                        # Copyable TSV
                         tsv_string = df.to_csv(sep="\t", index=False, header=False)
                         escaped_tsv = tsv_string.replace("\n", "\\n").replace('"', '\\"')
                     
-                        components.html(f"""
-                            <button id="copy-btn-{region}" style="
-                                margin-top:10px;
-                                padding:8px 16px;
-                                background-color:#4CAF50;
-                                color:white;
-                                border:none;
-                                border-radius:6px;
-                                cursor:pointer;
-                                font-size:14px;
-                            ">📋 Copy {region} Appeals</button>
-                            <span id="copy-msg-{region}" style="
-                                margin-left:12px;
-                                color:white;
-                                font-weight:bold;
-                                transition: opacity 0.4s ease;
-                                opacity: 0;
-                            ">Copied to clipboard</span>
+                        with col1:
+                            components.html(f"""
+                                <button id="copy-btn-{region}" style="
+                                    padding:8px 16px;
+                                    background-color:#4CAF50;
+                                    color:white;
+                                    border:none;
+                                    border-radius:6px;
+                                    cursor:pointer;
+                                    font-size:14px;
+                                ">📋 Copy {region} Appeals</button>
+                                <span id="copy-msg-{region}" style="
+                                    margin-left:12px;
+                                    color:white;
+                                    font-weight:bold;
+                                    transition: opacity 0.4s ease;
+                                    opacity: 0;
+                                ">Copied to clipboard</span>
                     
-                            <script>
-                                const btn = document.getElementById("copy-btn-{region}");
-                                const msg = document.getElementById("copy-msg-{region}");
+                                <script>
+                                    const btn = document.getElementById("copy-btn-{region}");
+                                    const msg = document.getElementById("copy-msg-{region}");
+                                    btn.onclick = function() {{
+                                        const text = "{escaped_tsv}";
+                                        navigator.clipboard.writeText(text).then(function() {{
+                                            msg.style.opacity = 1;
+                                            setTimeout(() => {{
+                                                msg.style.opacity = 0;
+                                            }}, 2000);
+                                        }});
+                                    }};
+                                </script>
+                            """, height=80)
                     
-                                btn.onclick = function() {{
-                                    const text = "{escaped_tsv}";
-                                    navigator.clipboard.writeText(text).then(function() {{
-                                        msg.style.opacity = 1;
-                                        setTimeout(() => {{
-                                            msg.style.opacity = 0;
-                                        }}, 2000);
-                                    }});
-                                }};
-                            </script>
-                        """, height=100)
+                        with col2:
+                            st.download_button(
+                                label=f"⬇️ Download {region} Appeals CSV",
+                                data=df.to_csv(index=False),
+                                file_name=f"{filename} - {region}.csv"
+                            )
                     
-                        st.download_button(
-                            label=f"⬇️ Download {region} Appeals CSV",
-                            data=df.to_csv(index=False),
-                            file_name=f"{filename} - {region}.csv"
-                        )
+                    # Render Ontario & Quebec
+                    render_appeals_section("Ontario", ontario_df, "Open_Appeals")
+                    render_appeals_section("Quebec", quebec_df, "Open_Appeals")
                     
-                    # 👇 Show Ontario + Quebec sections
-                    today_str = datetime.today().strftime("%B %d %Y")
-                    render_appeals_section("Ontario", ontario_df, f"Open_Appeals {today_str}")
-                    render_appeals_section("Quebec", quebec_df, f"Open_Appeals {today_str}")
-    
-                    st.subheader("📄 Open Appeals Table")
-                    st.dataframe(appeals_df, use_container_width=True)
+                    # ⬇️ Unified All Appeals (Copy + Download)
+                    if not appeals_df.empty:
+                        st.subheader("📄 All Appeals – Combined")
+                        col1, col2 = st.columns([1, 1])
+                        all_tsv = appeals_df.to_csv(sep="\t", index=False, header=False).replace("\n", "\\n").replace('"', '\\"')
                     
-                    # Convert to TSV, exclude header
-                    tsv_string = appeals_df.to_csv(sep="\t", index=False, header=False)
-                    escaped_tsv = tsv_string.replace("\n", "\\n").replace('"', '\\"')
+                        with col1:
+                            components.html(f"""
+                                <button id="copy-btn-all" style="
+                                    padding:8px 16px;
+                                    background-color:#1f77b4;
+                                    color:white;
+                                    border:none;
+                                    border-radius:6px;
+                                    cursor:pointer;
+                                    font-size:14px;
+                                ">📋 Copy All Appeals</button>
+                                <span id="copy-msg-all" style="
+                                    margin-left:12px;
+                                    color:white;
+                                    font-weight:bold;
+                                    transition: opacity 0.4s ease;
+                                    opacity: 0;
+                                ">Copied to clipboard</span>
                     
-                    components.html(f"""
-                        <button id="copy-btn" style="
-                            margin-top:10px;
-                            padding:8px 16px;
-                            background-color:#4CAF50;
-                            color:white;
-                            border:none;
-                            border-radius:6px;
-                            cursor:pointer;
-                            font-size:14px;
-                        ">
-                            📋 Copy Appeals Table
-                        </button>
-                        <span id="copy-msg" style="
-                            margin-left:12px;
-                            color:white;
-                            font-weight:bold;
-                            transition: opacity 0.4s ease;
-                            opacity: 0;
-                        ">Copied to clipboard</span>
+                                <script>
+                                    const btn = document.getElementById("copy-btn-all");
+                                    const msg = document.getElementById("copy-msg-all");
+                                    btn.onclick = function() {{
+                                        const text = "{all_tsv}";
+                                        navigator.clipboard.writeText(text).then(function() {{
+                                            msg.style.opacity = 1;
+                                            setTimeout(() => {{
+                                                msg.style.opacity = 0;
+                                            }}, 2000);
+                                        }});
+                                    }};
+                                </script>
+                            """, height=80)
                     
-                        <script>
-                            const btn = document.getElementById("copy-btn");
-                            const msg = document.getElementById("copy-msg");
-                    
-                            btn.onclick = function() {{
-                                const text = "{escaped_tsv}";
-                                navigator.clipboard.writeText(text).then(function() {{
-                                    msg.style.opacity = 1;
-                                    setTimeout(() => {{
-                                        msg.style.opacity = 0;
-                                    }}, 2000);
-                                }});
-                            }};
-                        </script>
-                    """, height=100)
-                        
-                    st.download_button(
-                        label="⬇️ Download Appeals CSV",
-                        data=appeals_df.to_csv(index=False),
-                        file_name=f"Open_Appeals {today_str}.csv"
-                    )
+                        with col2:
+                            st.download_button(
+                                label="⬇️ Download All Appeals CSV",
+                                data=appeals_df.to_csv(index=False),
+                                file_name=f"Open_Appeals {today_str}.csv"
+                            )
     
                 except Exception as e:
                     st.error("❌ Failed to generate Open Appeals table.")
