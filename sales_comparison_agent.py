@@ -104,7 +104,18 @@ if uploaded_file and sheet_url and run_button:
                 progress.progress(min(total_checked / len(summarized), 1.0))
 
                 if acct not in psu_df.index:
-                    mismatches.append({'Account Number': acct, 'Reason': 'Missing from report'})
+                    mismatches.append({
+                        'Account Number': acct,
+                        'Reason': 'Missing from report',
+                        'Internet_YESA': row['Internet'],
+                        'TV_YESA': row['TV'],
+                        'Phone_YESA': row['Phone'],
+                        'Client Account': acct,
+                        'Internet_Client': "",
+                        'TV_Client': "",
+                        'Phone_Client': "",
+                        'Date': ""
+                    })
                     continue
 
                 psu_rows = psu_df.loc[[acct]] if acct in psu_df.index else pd.DataFrame()
