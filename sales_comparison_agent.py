@@ -1,4 +1,5 @@
 import streamlit as st
+import streamlit.components.v1 as components
 import pandas as pd
 import gspread
 from google.oauth2.service_account import Credentials
@@ -216,16 +217,27 @@ if uploaded_file and sheet_url and run_button:
     
                     st.subheader("📄 Open Appeals Table")
                     st.dataframe(appeals_df, use_container_width=True)
-                    # Convert to tab-separated format for clean copying
-                    tsv_data = appeals_df.to_csv(index=False, sep="\t")
                     
-                    # HTML + JS button for copying
-                    st.markdown("""
-                        <button onclick="navigator.clipboard.writeText(document.getElementById('appeals-clip').textContent)">
+                    tsv_string = appeals_df.to_csv(sep="\t", index=False)
+                    escaped_tsv = tsv_string.replace("\n", "\\n").replace('"', '\\"')
+                    
+                    components.html(f"""
+                        <button id="copy-btn" style="margin-top:10px;padding:8px 12px;background-color:#4CAF50;color:white;border:none;border-radius:5px;cursor:pointer;">
                             📋 Copy Appeals Table
                         </button>
-                        <pre id="appeals-clip" style="display:none;">{}</pre>
-                    """.format(tsv_data), unsafe_allow_html=True)
+                        <span id="copy-msg" style="margin-left:10px;color:green;font-weight:bold;"></span>
+                        <script>
+                            const btn = document.getElementById("copy-btn");
+                            const msg = document.getElementById("copy-msg");
+                            btn.onclick = function() {{
+                                const text = "{escaped_tsv}";
+                                navigator.clipboard.writeText(text).then(function() {{
+                                    msg.textContent = "Copied to clipboard";
+                                    setTimeout(() => msg.textContent = "", 2000);
+                                }});
+                            }}
+                        </script>
+                    """, height=100)
                         
                     st.download_button(
                         label="⬇️ Download Appeals CSV",
