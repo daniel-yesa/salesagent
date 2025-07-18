@@ -209,33 +209,36 @@ if uploaded_file and sheet_url and run_button:
 
                 st.download_button("⬇️ Download CSV", result_df.to_csv(index=False), file_name=filename)
             
+            # ✅ Save results in session to persist across UI re-runs
             st.session_state['mismatches'] = result_df
             st.session_state['internal_df'] = internal_df
+            st.session_state['uploaded_file'] = uploaded_file
             
-            # --- After displaying mismatches ---
-            if "mismatches" in st.session_state and "internal_df" in st.session_state:
+            # ✅ Generate Appeals: survives reruns
+            if 'mismatches' in st.session_state and 'internal_df' in st.session_state:
                 if st.button("📄 Generate General Appeals"):
                     with st.spinner("Generating Open Appeals..."):
                         try:
                             result_df = st.session_state['mismatches']
                             internal_df = st.session_state['internal_df']
+            
                             merged_df = pd.merge(result_df, internal_df, on="Account Number", how="left")
-        
+            
                             def format_address(row):
                                 addr = row.get("Customer Address", "")
                                 addr2 = row.get("Customer Address Line 2", "")
                                 return f"{addr}, {addr2}" if pd.notna(addr2) and addr2.strip() else addr
-        
+            
                             def install_type(val):
                                 return "Self Install" if str(val).strip().lower() == "yes" else "Tech Visit"
-        
+            
                             def map_reason(reason):
                                 if reason == "Missing from report":
                                     return "Account missing from report"
                                 if reason == "PSU - no match":
                                     return "PSUs don't match report"
                                 return ""
-        
+            
                             open_appeals = pd.DataFrame({
                                 "Account number": merged_df["Account Number"],
                                 "Customer Address": merged_df.apply(format_address, axis=1),
@@ -250,14 +253,14 @@ if uploaded_file and sheet_url and run_button:
                                 "Phone": merged_df["Phone_YESA"].apply(lambda x: 1 if x == 1 else ""),
                                 "Reason for Appeal": merged_df["Reason"].apply(map_reason),
                             })
-        
+            
                             st.subheader("📄 General Appeals Table")
                             st.dataframe(open_appeals, use_container_width=True)
-        
+            
                             today_str = datetime.today().strftime("%B %d %Y")
                             appeal_filename = f"Open_Appeals {today_str}.csv"
                             st.download_button("⬇️ Download Appeals CSV", open_appeals.to_csv(index=False), file_name=appeal_filename)
-        
+            
                         except Exception as e:
                             st.error("❌ Failed to generate appeals table.")
                             if debug_mode:
