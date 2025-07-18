@@ -158,26 +158,24 @@ if uploaded_file and sheet_url and run_button:
                 # --- ⬇️ Generate Open Appeals table directly ---
                 try:
                     merged_df = pd.merge(result_df, internal_df, on="Account Number", how="left")
-                
+
                     def format_address(row):
                         addr = row.get("Customer Address", "")
                         addr2 = row.get("Customer Address Line 2", "")
                         return f"{addr}, {addr2}" if pd.notna(addr2) and addr2.strip() else addr
-                
+
                     def install_type(val):
                         return "Self Install" if str(val).strip().lower() == "yes" else "Tech Visit"
-                
+
                     def map_reason(reason):
                         if reason == "Missing from report":
                             return "Account missing from report"
                         if reason == "PSU - no match":
                             return "PSUs don't match report"
                         return ""
-                
-                    # Ensure all date fields are parsed
+
                     merged_df["Date of Sale_x"] = pd.to_datetime(merged_df["Date of Sale_x"], errors="coerce")
                     merged_df["Scheduled Install Date"] = pd.to_datetime(merged_df["Scheduled Install Date"], errors="coerce")
-                
                     today_mmddyyyy = datetime.today().strftime("%m/%d/%Y")
 
                     appeals_df = pd.DataFrame({
@@ -197,21 +195,19 @@ if uploaded_file and sheet_url and run_button:
                         "Phone": merged_df["Phone_YESA"].apply(lambda x: 1 if x == 1 else ""),
                         "Reason for Appeal": merged_df["Reason"].apply(map_reason),
                     })
-                
-                    # ✅ Drop duplicate account rows
+
                     appeals_df = appeals_df.drop_duplicates(subset=["Account number"])
-                
+
                     st.subheader("📄 Open Appeals Table")
                     st.dataframe(appeals_df, use_container_width=True)
-                
-                    today_str = datetime.today().strftime("%B %d %Y")
+
                     st.download_button(
                         label="⬇️ Download Appeals CSV",
                         data=appeals_df.to_csv(index=False),
                         file_name=f"Open_Appeals {today_str}.csv"
                     )
-                
-        except Exception as e:
-            st.error("❌ Failed to generate Open Appeals table.")
-            if debug_mode:
-                st.exception(e)
+
+                except Exception as e:
+                    st.error("❌ Failed to generate Open Appeals table.")
+                    if debug_mode:
+                        st.exception(e)
