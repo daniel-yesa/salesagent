@@ -6,6 +6,13 @@ from datetime import datetime
 import json
 import traceback
 
+# --- Password Gate ---
+st.markdown("## 🔒 Enter Access Password")
+password = st.text_input("Password", type="password")
+if password != "YESADATA":
+    st.warning("🔐 Access restricted. Enter the correct password to continue.")
+    st.stop()
+
 # --- Streamlit UI ---
 st.set_page_config(page_title="Findr | YESA", layout="wide")
 st.markdown("""
@@ -40,6 +47,10 @@ uploaded_file = st.file_uploader("\U0001F4C4 Upload Booked Sales CSV", type=["cs
 default_url = "https://docs.google.com/spreadsheets/d/1tamMxhdJ-_wuyCrmu9mK6RiVj1lZsUJBSm0gSBbjQwM/edit?gid=1075311190#gid=1075311190"
 sheet_url = st.text_input("\U0001F517 Paste Google Sheet URL (Merged PSUReport)", value=default_url)
 start_date, end_date = st.date_input("\U0001F4C5 Select Date Range", [datetime.today(), datetime.today()])
+appealer_name = st.text_input("🧾 Name of Appealer (required)")
+
+if uploaded_file and not appealer_name.strip():
+    st.warning("⚠️ Please enter your name before running the report.")
 
 if uploaded_file:
     st.session_state['uploaded_file'] = uploaded_file
@@ -144,45 +155,63 @@ if uploaded_file and sheet_url and run_button:
                 today_str = datetime.today().strftime("%B %d %Y")
                 st.download_button("⬇️ Download CSV", result_df.to_csv(index=False), file_name=f"Mismatched {today_str}.csv")
 
-                # --- Open Appeals Table ---
-                merged_df = pd.merge(result_df, internal_df, on="Account Number", how="left")
+                # --- ⬇️ Generate Open Appeals table directly ---
+                try:
+                    merged_df = pd.merge(result_df, internal_df, on="Account Number", how="left")
+                
+                    def format_address(row):
+                        addr = row.get("Customer Address", "")
+                        addr2 = row.get("Customer Address Line 2", "")
+                        return f"{addr}, {addr2}" if pd.notna(addr2) and addr2.strip() else addr
+                
+                    def install_type(val):
+                        return "Self Install" if str(val).strip().lower() == "yes" else "Tech Visit"
+                
+                    def map_reason(reason):
+                        if reason == "Missing from report":
+                            return "Account missing from report"
+                        if reason == "PSU - no match":
+                            return "PSUs don't match report"
+                        return ""
+                
+                    # Ensure all date fields are parsed
+                    merged_df["Date of Sale_x"] = pd.to_datetime(merged_df["Date of Sale_x"], errors="coerce")
+                    merged_df["Scheduled Install Date"] = pd.to_datetime(merged_df["Scheduled Install Date"], errors="coerce")
+                
+                    today_mmddyyyy = datetime.today().strftime("%m/%d/%Y")
 
-                def format_address(row):
-                    addr = row.get("Customer Address", "")
-                    addr2 = row.get("Customer Address Line 2", "")
-                    return f"{addr}, {addr2}" if pd.notna(addr2) and addr2.strip() else addr
-
-                def install_type(val):
-                    return "Self Install" if str(val).strip().lower() == "yes" else "Tech Visit"
-
-                def map_reason(reason):
-                    if reason == "Missing from report":
-                        return "Account missing from report"
-                    if reason == "PSU - no match":
-                        return "PSUs don't match report"
-                    return ""
-
-                appeals_df = pd.DataFrame({
-                    "Account number": merged_df["Account Number"],
-                    "Customer Address": merged_df.apply(format_address, axis=1),
-                    "City": merged_df["City"],
-                    "Date Of Sale": merged_df["Date of Sale"],
-                    "Sales Rep": merged_df["Sale Rep"],
-                    "Rep ID": merged_df["Rep Id"],
-                    "Install Type": merged_df["Self Install"].apply(install_type),
-                    "Installation Date": merged_df["Scheduled Install Date"],
-                    "Internet": merged_df["Internet_YESA"].apply(lambda x: 1 if x == 1 else ""),
-                    "TV": merged_df["TV_YESA"].apply(lambda x: 1 if x == 1 else ""),
-                    "Phone": merged_df["Phone_YESA"].apply(lambda x: 1 if x == 1 else ""),
-                    "Reason for Appeal": merged_df["Reason"].apply(map_reason),
-                })
-
-                st.subheader("\U0001F4C4 Open Appeals Table")
-                st.dataframe(appeals_df, use_container_width=True)
-                st.download_button("⬇️ Download Appeals CSV", appeals_df.to_csv(index=False), file_name=f"Open_Appeals {today_str}.csv")
-
-        except Exception as e:
-            st.error("❌ Error occurred during processing.")
-            st.exception(e)
-            if debug_mode:
-                st.code(traceback.format_exc(), language="python")
+                    appeals_df = pd.DataFrame({
+                        "Type of Appeal": ["Open"] * len(merged_df),
+                        "Name of Appealer": [appealer_name] * len(merged_df),
+                        "Date of Appeal": [today_mmddyyyy] * len(merged_df),
+                        "Account number": merged_df["Account Number"],
+                        "Customer Address": merged_df.apply(format_address, axis=1),
+                        "City": merged_df["City"],
+                        "Date Of Sale": merged_df["Date of Sale_x"].dt.strftime("%m/%d/%Y"),
+                        "Sales Rep": merged_df["Sale Rep"],
+                        "Rep ID": merged_df["Rep Id"],
+                        "Install Type": merged_df["Self Install"].apply(install_type),
+                        "Installation Date": merged_df["Scheduled Install Date"].dt.strftime("%m/%d/%Y"),
+                        "Internet": merged_df["Internet_YESA"].apply(lambda x: 1 if x == 1 else ""),
+                        "TV": merged_df["TV_YESA"].apply(lambda x: 1 if x == 1 else ""),
+                        "Phone": merged_df["Phone_YESA"].apply(lambda x: 1 if x == 1 else ""),
+                        "Reason for Appeal": merged_df["Reason"].apply(map_reason),
+                    })
+                
+                    # ✅ Drop duplicate account rows
+                    appeals_df = appeals_df.drop_duplicates(subset=["Account number"])
+                
+                    st.subheader("📄 Open Appeals Table")
+                    st.dataframe(appeals_df, use_container_width=True)
+                
+                    today_str = datetime.today().strftime("%B %d %Y")
+                    st.download_button(
+                        label="⬇️ Download Appeals CSV",
+                        data=appeals_df.to_csv(index=False),
+                        file_name=f"Open_Appeals {today_str}.csv"
+                    )
+                
+                except Exception as e:
+                    st.error("❌ Failed to generate Open Appeals table.")
+                    if debug_mode:
+                        st.exception(e)
