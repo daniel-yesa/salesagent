@@ -47,7 +47,12 @@ def match_product(name, keywords):
 uploaded_file = st.file_uploader("\U0001F4C4 Upload Booked Sales CSV", type=["csv"])
 default_url = "https://docs.google.com/spreadsheets/d/1tamMxhdJ-_wuyCrmu9mK6RiVj1lZsUJBSm0gSBbjQwM/edit?gid=1075311190#gid=1075311190"
 sheet_url = st.text_input("\U0001F517 Paste Google Sheet URL (Merged PSUReport)", value=default_url)
-start_date, end_date = st.date_input("\U0001F4C5 Select Date Range", [datetime.today(), datetime.today()])
+date_range = st.date_input("📅 Booked Date Range", value=None, help="Select booked date range")
+if not date_range or len(date_range) != 2:
+    st.warning("⚠️ Please select a valid start and end date.")
+    st.stop()
+start_date, end_date = date_range
+
 appealer_name = st.text_input("🧾 Name of Appealer (required)")
 
 if uploaded_file and not appealer_name.strip():
