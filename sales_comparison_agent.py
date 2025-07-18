@@ -15,7 +15,7 @@ st.markdown("""
         }
     </style>
 """, unsafe_allow_html=True)
-st.title("✨ Findr - Accounts Missing / PSU no match Finder")
+st.title("✨ Findr - Accounts Missing / PSU no match")
 debug_mode = st.checkbox("🔍 Enable Debug Mode")
 
 # --- Keywords ---
