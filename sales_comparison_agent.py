@@ -200,7 +200,17 @@ if uploaded_file and sheet_url and run_button:
     
                     st.subheader("📄 Open Appeals Table")
                     st.dataframe(appeals_df, use_container_width=True)
-    
+                    # Convert to tab-separated format for clean copying
+                    tsv_data = appeals_df.to_csv(index=False, sep="\t")
+                    
+                    # HTML + JS button for copying
+                    st.markdown("""
+                        <button onclick="navigator.clipboard.writeText(document.getElementById('appeals-clip').textContent)">
+                            📋 Copy Appeals Table
+                        </button>
+                        <pre id="appeals-clip" style="display:none;">{}</pre>
+                    """.format(tsv_data), unsafe_allow_html=True)
+                        
                     st.download_button(
                         label="⬇️ Download Appeals CSV",
                         data=appeals_df.to_csv(index=False),
