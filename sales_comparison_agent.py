@@ -37,6 +37,10 @@ def match_product(name, keywords):
 
 # --- Inputs ---
 uploaded_file = st.file_uploader("📄 Upload Booked Sales CSV", type=["csv"])
+if 'uploaded_file' not in st.session_state:
+    st.session_state['uploaded_file'] = uploaded_file
+else:
+    uploaded_file = st.session_state['uploaded_file']
 default_url = "https://docs.google.com/spreadsheets/d/1tamMxhdJ-_wuyCrmu9mK6RiVj1lZsUJBSm0gSBbjQwM/edit?gid=1075311190#gid=1075311190"
 sheet_url = st.text_input("🔗 Paste Google Sheet URL (Merged PSUReport)", value=default_url)
 start_date, end_date = st.date_input("🗓 Select Date Range", [datetime.today(), datetime.today()])
@@ -213,6 +217,7 @@ if uploaded_file and sheet_url and run_button:
             st.session_state['mismatches'] = result_df
             st.session_state['internal_df'] = internal_df
             st.session_state['uploaded_file'] = uploaded_file
+
             
             # ✅ Generate Appeals: survives reruns
             if 'mismatches' in st.session_state and 'internal_df' in st.session_state:
