@@ -193,6 +193,11 @@ if uploaded_file and sheet_url and run_button:
                         "Internet": merged_df["Internet_YESA"].apply(lambda x: 1 if x == 1 else ""),
                         "TV": merged_df["TV_YESA"].apply(lambda x: 1 if x == 1 else ""),
                         "Phone": merged_df["Phone_YESA"].apply(lambda x: 1 if x == 1 else ""),
+                        "Products": (
+                            merged_df["Internet_YESA"].apply(lambda x: 1 if x == 1 else 0) +
+                            merged_df["TV_YESA"].apply(lambda x: 1 if x == 1 else 0) +
+                            merged_df["Phone_YESA"].apply(lambda x: 1 if x == 1 else 0)
+                        ),
                         "Reason for Appeal": merged_df["Reason"].apply(map_reason),
                     })
     
