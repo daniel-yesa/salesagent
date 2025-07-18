@@ -218,26 +218,46 @@ if uploaded_file and sheet_url and run_button:
                     st.subheader("📄 Open Appeals Table")
                     st.dataframe(appeals_df, use_container_width=True)
                     
-                    tsv_string = appeals_df.to_csv(sep="\t", index=False)
+                    # Convert to TSV, exclude header
+                    tsv_string = appeals_df.to_csv(sep="\t", index=False, header=False)
                     escaped_tsv = tsv_string.replace("\n", "\\n").replace('"', '\\"')
                     
                     components.html(f"""
-                        <button id="copy-btn" style="margin-top:10px;padding:8px 12px;background-color:#4CAF50;color:white;border:none;border-radius:5px;cursor:pointer;">
+                        <button id="copy-btn" style="
+                            margin-top:10px;
+                            padding:8px 16px;
+                            background-color:#4CAF50;
+                            color:white;
+                            border:none;
+                            border-radius:6px;
+                            cursor:pointer;
+                            font-size:14px;
+                        ">
                             📋 Copy Appeals Table
                         </button>
-                        <span id="copy-msg" style="margin-left:10px;color:green;font-weight:bold;"></span>
+                        <span id="copy-msg" style="
+                            margin-left:12px;
+                            color:white;
+                            font-weight:bold;
+                            transition: opacity 0.4s ease;
+                            opacity: 0;
+                        ">Copied to clipboard</span>
+                    
                         <script>
                             const btn = document.getElementById("copy-btn");
                             const msg = document.getElementById("copy-msg");
+                    
                             btn.onclick = function() {{
                                 const text = "{escaped_tsv}";
                                 navigator.clipboard.writeText(text).then(function() {{
-                                    msg.textContent = "Copied to clipboard";
-                                    setTimeout(() => msg.textContent = "", 2000);
+                                    msg.style.opacity = 1;
+                                    setTimeout(() => {{
+                                        msg.style.opacity = 0;
+                                    }}, 2000);
                                 }});
-                            }}
+                            }};
                         </script>
-                    """, height=100)
+                    "", height=100)
                         
                     st.download_button(
                         label="⬇️ Download Appeals CSV",
