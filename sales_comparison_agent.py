@@ -37,9 +37,9 @@ def match_product(name, keywords):
 
 # --- Inputs ---
 uploaded_file = st.file_uploader("📄 Upload Booked Sales CSV", type=["csv"])
-if 'uploaded_file' not in st.session_state:
+if uploaded_file:
     st.session_state['uploaded_file'] = uploaded_file
-else:
+elif 'uploaded_file' in st.session_state:
     uploaded_file = st.session_state['uploaded_file']
 default_url = "https://docs.google.com/spreadsheets/d/1tamMxhdJ-_wuyCrmu9mK6RiVj1lZsUJBSm0gSBbjQwM/edit?gid=1075311190#gid=1075311190"
 sheet_url = st.text_input("🔗 Paste Google Sheet URL (Merged PSUReport)", value=default_url)
