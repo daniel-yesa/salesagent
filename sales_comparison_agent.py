@@ -226,8 +226,9 @@ if uploaded_file and sheet_url and run_button:
                             return
                     
                         st.subheader(f"📄 {region} Appeals")
-                        col1, col2 = st.columns([1, 1])
+                        st.dataframe(df, use_container_width=True)
                     
+                        col1, col2 = st.columns([1, 1])
                         tsv_string = df.to_csv(sep="\t", index=False, header=False)
                         escaped_tsv = tsv_string.replace("\n", "\\n").replace('"', '\\"')
                     
@@ -272,13 +273,14 @@ if uploaded_file and sheet_url and run_button:
                                 file_name=f"{filename} - {region}.csv"
                             )
                     
-                    # Render Ontario & Quebec
+                    # Render both appeal regions
                     render_appeals_section("Ontario", ontario_df, "Open_Appeals")
                     render_appeals_section("Quebec", quebec_df, "Open_Appeals")
                     
                     # ⬇️ Unified All Appeals (Copy + Download)
                     if not appeals_df.empty:
                         st.subheader("📄 All Appeals – Combined")
+                    
                         col1, col2 = st.columns([1, 1])
                         all_tsv = appeals_df.to_csv(sep="\t", index=False, header=False).replace("\n", "\\n").replace('"', '\\"')
                     
@@ -322,6 +324,7 @@ if uploaded_file and sheet_url and run_button:
                                 data=appeals_df.to_csv(index=False),
                                 file_name=f"Open_Appeals {today_str}.csv"
                             )
+
     
                 except Exception as e:
                     st.error("❌ Failed to generate Open Appeals table.")
