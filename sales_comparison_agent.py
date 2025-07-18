@@ -7,7 +7,7 @@ import json
 import traceback
 
 # --- Streamlit UI ---
-st.set_page_config(page_title="MatchMate | YESA", layout="wide")
+st.set_page_config(page_title="Findr | YESA", layout="wide")
 st.markdown("""
     <style>
         html, body, [class*="css"] {
@@ -15,7 +15,7 @@ st.markdown("""
         }
     </style>
 """, unsafe_allow_html=True)
-st.title("✨ MatchMate - Accounts Missing Finder")
+st.title("✨ Findr - Accounts Missing / PSU no match Finder")
 debug_mode = st.checkbox("🔍 Enable Debug Mode")
 
 # --- Keywords ---
