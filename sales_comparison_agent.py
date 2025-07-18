@@ -214,6 +214,67 @@ if uploaded_file and sheet_url and run_button:
                     })
     
                     appeals_df = appeals_df.drop_duplicates(subset=["Account number"])
+                    # Split Ontario and Quebec
+                    ontario_df = appeals_df[appeals_df["Account number"].astype(str).str.startswith("500")]
+                    quebec_df = appeals_df[appeals_df["Account number"].astype(str).str.startswith("960")]
+                    
+                    def render_appeals_section(region, df, filename):
+                        if df.empty:
+                            st.info(f"ℹ️ No {region} appeals found.")
+                            return
+                    
+                        st.subheader(f"📄 Open Appeals Table – {region}")
+                        st.dataframe(df, use_container_width=True)
+                    
+                        # Copyable TSV
+                        tsv_string = df.to_csv(sep="\t", index=False, header=False)
+                        escaped_tsv = tsv_string.replace("\n", "\\n").replace('"', '\\"')
+                    
+                        components.html(f"""
+                            <button id="copy-btn-{region}" style="
+                                margin-top:10px;
+                                padding:8px 16px;
+                                background-color:#4CAF50;
+                                color:white;
+                                border:none;
+                                border-radius:6px;
+                                cursor:pointer;
+                                font-size:14px;
+                            ">📋 Copy {region} Appeals</button>
+                            <span id="copy-msg-{region}" style="
+                                margin-left:12px;
+                                color:white;
+                                font-weight:bold;
+                                transition: opacity 0.4s ease;
+                                opacity: 0;
+                            ">Copied to clipboard</span>
+                    
+                            <script>
+                                const btn = document.getElementById("copy-btn-{region}");
+                                const msg = document.getElementById("copy-msg-{region}");
+                    
+                                btn.onclick = function() {{
+                                    const text = "{escaped_tsv}";
+                                    navigator.clipboard.writeText(text).then(function() {{
+                                        msg.style.opacity = 1;
+                                        setTimeout(() => {{
+                                            msg.style.opacity = 0;
+                                        }}, 2000);
+                                    }});
+                                }};
+                            </script>
+                        """, height=100)
+                    
+                        st.download_button(
+                            label=f"⬇️ Download {region} Appeals CSV",
+                            data=df.to_csv(index=False),
+                            file_name=f"{filename} - {region}.csv"
+                        )
+                    
+                    # 👇 Show Ontario + Quebec sections
+                    today_str = datetime.today().strftime("%B %d %Y")
+                    render_appeals_section("Ontario", ontario_df, f"Open_Appeals {today_str}")
+                    render_appeals_section("Quebec", quebec_df, f"Open_Appeals {today_str}")
     
                     st.subheader("📄 Open Appeals Table")
                     st.dataframe(appeals_df, use_container_width=True)
