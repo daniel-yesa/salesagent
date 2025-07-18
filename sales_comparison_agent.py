@@ -47,12 +47,18 @@ def match_product(name, keywords):
 uploaded_file = st.file_uploader("\U0001F4C4 Upload Booked Sales CSV", type=["csv"])
 default_url = "https://docs.google.com/spreadsheets/d/1tamMxhdJ-_wuyCrmu9mK6RiVj1lZsUJBSm0gSBbjQwM/edit?gid=1075311190#gid=1075311190"
 sheet_url = st.text_input("\U0001F517 Paste Google Sheet URL (Merged PSUReport)", value=default_url)
-# Clean date range input with no placeholder styling
-start_date, end_date = st.date_input(
-    label="📅 Select booked date range",
+# Show date range input
+date_range = st.date_input(
+    "📅 Select booked date range",
     value=(date.today(), date.today()),
     key="booked_date_range"
 )
+
+# Only unpack and use if both dates are selected
+if isinstance(date_range, tuple) and len(date_range) == 2:
+    start_date, end_date = date_range
+else:
+    start_date, end_date = None, None
 
 appealer_name = st.text_input("🧾 Name of Appealer (required)")
 
@@ -66,7 +72,7 @@ elif 'uploaded_file' in st.session_state:
 
 run_button = st.button("\U0001F680 Run Missing Report")
 
-if uploaded_file and sheet_url and run_button:
+if start_date and end_date and uploaded_file and sheet_url and run_button:
     with st.spinner("Processing..."):
         try:
             internal_df = pd.read_csv(uploaded_file)
