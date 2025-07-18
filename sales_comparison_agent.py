@@ -41,6 +41,11 @@ if uploaded_file:
     st.session_state['uploaded_file'] = uploaded_file
 elif 'uploaded_file' in st.session_state:
     uploaded_file = st.session_state['uploaded_file']
+
+if uploaded_file is None:
+    st.error("❌ No uploaded file found.")
+    st.stop()
+    
 default_url = "https://docs.google.com/spreadsheets/d/1tamMxhdJ-_wuyCrmu9mK6RiVj1lZsUJBSm0gSBbjQwM/edit?gid=1075311190#gid=1075311190"
 sheet_url = st.text_input("🔗 Paste Google Sheet URL (Merged PSUReport)", value=default_url)
 start_date, end_date = st.date_input("🗓 Select Date Range", [datetime.today(), datetime.today()])
